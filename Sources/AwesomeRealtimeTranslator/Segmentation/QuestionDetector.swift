@@ -19,13 +19,48 @@ enum QuestionDetector {
         // 2. 中文语气词结尾：「你做过吗」「那你怎么看呢」
         if "吗呢吧".contains(last) { return true }
 
-        // 3. 模型给了陈述句标点，就相信它。这一档是**防误判**的关键：
+        // 3. 面试祈使句，**先于标点判断**。
+        //
+        //    这一档的位置是实测改出来的。原来它排在标点否决之后，结果
+        //    "Tell me about a time you disagreed with your manager." 被句号否决掉，
+        //    整个功能最该钉住的那类问题一个都钉不上 —— 而祈使句本来就该带句号，
+        //    拿句号否决它等于否决了这一整类。
+        //
+        //    靠词组而不是单词来防误判："tell me" 是提问，"tell you what" 不是。
+        if isImperativePrompt(trimmed) { return true }
+
+        // 4. 模型给了陈述句标点，就相信它。
         //    "Did that help you?" 已经被第 1 档收走，剩下以句号结尾的
         //    "Did" 开头句（"Did I mention we're hiring."）不该被当成提问。
         if ".!。！…;；".contains(last) { return false }
 
-        // 4. 没有任何句末标点 —— 被静音或长度硬切出来的句子。只能看句首。
+        // 5. 没有任何句末标点 —— 被静音或长度硬切出来的句子。只能看句首。
         return openers.contains(firstWord(of: trimmed))
+    }
+
+    /// 面试里等价于提问的祈使句。
+    ///
+    /// "Tell me about a time you disagreed with your manager" 语法上不是疑问句，
+    /// 还经常带句号，但它就是要被钉住的那个问题 —— 这才是这个功能存在的理由。
+    private static func isImperativePrompt(_ text: String) -> Bool {
+        let lowered = text.lowercased()
+        // 中文没有词边界，只能前缀匹配
+        for prefix in ["说说", "聊聊", "请问", "谈谈", "讲讲"] where lowered.hasPrefix(prefix) {
+            return true
+        }
+        let words = lowered
+            .split(whereSeparator: { $0 == " " || $0 == "\n" })
+            .prefix(2)
+            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "(（\"'“‘,，、")) }
+        guard let first = words.first else { return false }
+        // 单词就能确定的：这些词开头几乎只可能是在提要求
+        if ["describe", "explain", "share", "suppose", "imagine"].contains(first) {
+            return true
+        }
+        // 需要看第二个词：tell me ✓ / tell you what ✗
+        guard words.count == 2 else { return false }
+        return ["tell", "walk", "give", "show"].contains(first)
+            && ["me", "us"].contains(words[1])
     }
 
     /// 句首触发词。

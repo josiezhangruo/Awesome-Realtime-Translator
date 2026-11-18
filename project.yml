@@ -48,6 +48,7 @@ targets:
       - path: Sources/AwesomeRealtimeTranslator/Segmentation/Segmenter.swift
       - path: Sources/AwesomeRealtimeTranslator/Segmentation/QuestionDetector.swift
       - path: Sources/AwesomeRealtimeTranslator/Transcription/Transcriber.swift
+      - path: Sources/AwesomeRealtimeTranslator/Caption/CaptionStore.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.leon.AwesomeRealtimeTranslatorTests

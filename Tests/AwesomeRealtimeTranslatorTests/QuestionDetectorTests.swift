@@ -34,6 +34,22 @@ final class QuestionDetectorTests: XCTestCase {
         XCTAssertFalse(QuestionDetector.isQuestion("Tell you what, let's move on."))
     }
 
+    /// 祈使句排在标点否决**之前**。实测发现的 bug：原来顺序反了，
+    /// "Tell me about..." 带句号被整个否决，而这正是最该钉住的那类问题。
+    func testImperativePromptSurvivesAPeriod() {
+        XCTAssertTrue(QuestionDetector.isQuestion("Tell me about a time you disagreed with your manager."))
+        XCTAssertTrue(QuestionDetector.isQuestion("Walk us through the incident."))
+        XCTAssertTrue(QuestionDetector.isQuestion("Describe the hardest bug you've shipped."))
+        XCTAssertTrue(QuestionDetector.isQuestion("说说你最近做的项目。"))
+    }
+
+    /// 靠词组而不是单词区分：tell me 是提问，tell you what 不是。
+    func testImperativeNeedsTheRightObject() {
+        XCTAssertTrue(QuestionDetector.isQuestion("Tell me about it."))
+        XCTAssertFalse(QuestionDetector.isQuestion("Tell you what, let's move on."))
+        XCTAssertFalse(QuestionDetector.isQuestion("Give it another try."))
+    }
+
     // MARK: - 第 4 档：没有句末标点，看句首
 
     /// 被静音或长度硬切出来的句子没有任何句末标点，这是实际最常见的情况。

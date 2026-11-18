@@ -70,21 +70,33 @@ final class CaptionStore {
 
     /// 钉住最近一个提问。不设过期时间：你答了五分钟，刚才那个问题仍然是「当前问题」，
     /// 直到下一个问题出现才该被换掉。
+    ///
+    /// **先判追问，再判新问题** —— 顺序反了就会出现实测里的那个 bug：
+    /// "Tell me about X." / "And how would you handle it differently now?"
+    /// 后半句自带问号，被当成新问题把前半句整个替换掉，钉住条最后只剩后半截，
+    /// 恰好和这个功能的目的相反。紧挨着的两句本来就是同一个问题。
     private func updatePin(with sentence: Sentence) {
-        if QuestionDetector.isQuestion(sentence.text) {
-            pinnedQuestionIDs = [sentence.id]
+        if isContinuation(of: sentence) {
+            pinnedQuestionIDs.append(sentence.id)
             lastPinnedEndedAt = sentence.endedAt
             return
         }
-        // 两段式问题的后半截：「...and how would you do it differently now」
-        // 本身不是疑问句，但紧接在提问之后，丢了它就等于丢了半个问题。
+        guard QuestionDetector.isQuestion(sentence.text) else { return }
+        pinnedQuestionIDs = [sentence.id]
+        lastPinnedEndedAt = sentence.endedAt
+    }
+
+    /// 这一句是不是上一个提问的后半截。
+    ///
+    /// 判据是时间：提问结束 `continuationWindow` 秒内到达。之所以够用，是因为
+    /// 本应用**不采集麦克风** —— 这段时间里能被听到的只可能是面试官继续说，
+    /// 不可能是你开口回答。所以不看内容，自带问号的后半句也算追问。
+    private func isContinuation(of sentence: Sentence) -> Bool {
         guard !pinnedQuestionIDs.isEmpty,
               pinnedQuestionIDs.count < Self.maxPinnedSegments,
-              let end = lastPinnedEndedAt,
-              sentence.startedAt - end <= Self.continuationWindow
-        else { return }
-        pinnedQuestionIDs.append(sentence.id)
-        lastPinnedEndedAt = sentence.endedAt
+              let end = lastPinnedEndedAt
+        else { return false }
+        return sentence.startedAt - end <= Self.continuationWindow
     }
 
     func setTranslation(_ text: String, for id: UUID) {

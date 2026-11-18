@@ -11,6 +11,9 @@ struct CaptionView: View {
     let settings: AppSettings
     var onToggle: () -> Void
 
+    /// 备忘录是否展开。刻意**不持久化**：下次打开字幕窗该是看字幕，不是看备忘录。
+    @State private var showMemo = false
+
     private var isRunning: Bool { store.isRunning }
 
     private var visible: [CaptionLine] { store.tail(settings.visibleLines) }
@@ -19,8 +22,14 @@ struct CaptionView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider().opacity(0.25)
-            pinnedQuestionBar
-            content
+            // 备忘录**覆盖**字幕区而不是挤在它旁边：窗口只有 180 像素高，
+            // 两者并排谁都看不清。而且看备忘录的时候你本来就不在听当前这句。
+            if showMemo {
+                memoList
+            } else {
+                pinnedQuestionBar
+                content
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
@@ -57,6 +66,16 @@ struct CaptionView: View {
             }
             .buttonStyle(.plain)
             .help(isRunning ? "暂停" : "开始")
+
+            Button {
+                showMemo.toggle()
+            } label: {
+                Image(systemName: "note.text")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(showMemo ? Color.green.opacity(0.9) : .white.opacity(0.45))
+            }
+            .buttonStyle(.plain)
+            .help(showMemo ? "回到字幕" : "问题备忘录")
 
             Button(action: Self.openSettings) {
                 Image(systemName: "gearshape.fill")
@@ -126,6 +145,59 @@ struct CaptionView: View {
             .background(Color.green.opacity(0.1))
             .overlay(alignment: .bottom) { Divider().opacity(0.25) }
         }
+    }
+
+    // MARK: - 问题备忘录
+
+    /// 本场问过的每一轮问题。只读、不滚动跟随 —— 你是主动翻它的，
+    /// 新问题进来时把你正在看的位置顶走会很烦。
+    private var memoList: some View {
+        ScrollView(.vertical) {
+            let memo = store.questionMemo
+            VStack(alignment: .leading, spacing: 12) {
+                if memo.isEmpty {
+                    Text("这一场还没检测到提问")
+                        .font(.system(size: settings.fontSize - 2))
+                        .foregroundStyle(.white.opacity(0.4))
+                } else {
+                    ForEach(Array(memo.enumerated()), id: \.offset) { index, group in
+                        memoEntry(index: index, group: group)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
+        .scrollIndicators(.visible)
+    }
+
+    @ViewBuilder
+    private func memoEntry(index: Int, group: [CaptionLine]) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("\(index + 1)")
+                .font(.system(size: settings.fontSize - 4, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.green.opacity(0.7))
+                .frame(minWidth: 14, alignment: .trailing)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                if settings.displayMode.showsSource {
+                    Text(group.map(\.source).joined(separator: " "))
+                        .font(.system(size: settings.fontSize - 2))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .textSelection(.enabled)
+                }
+                let translated = group.compactMap(\.translation).joined(separator: " ")
+                if settings.displayMode.showsTranslation, !translated.isEmpty {
+                    Text(translated)
+                        .font(.system(size: settings.fontSize - 1, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .textSelection(.enabled)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - 字幕正文

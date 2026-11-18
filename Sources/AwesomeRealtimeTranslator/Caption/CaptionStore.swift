@@ -28,30 +28,49 @@ final class CaptionStore {
 
     private let maxLines = 2000
 
-    // MARK: - 钉住当前问题
+    // MARK: - 钉住当前问题 / 问题备忘录
 
-    /// 当前被钉住的提问，按说出顺序。存 id 而不是文本，这样译文回来时钉住条会自己更新。
-    private(set) var pinnedQuestionIDs: [UUID] = []
-    /// 最后一段被钉住的话结束的时间，用来判断下一句是不是同一个问题的后半截
+    /// 本场所有提问，按「轮」分组。一轮 = 面试官一口气问的那几句。
+    /// 钉住条只显示最后一组，备忘录显示全部。
+    /// 存 id 而不是文本，这样译文回来时两处都会自己更新。
+    private(set) var questionGroups: [[UUID]] = []
+    /// 当前这一轮最后一句话结束的时间，用来判断下一句是否还属于这一轮
     private var lastPinnedEndedAt: TimeInterval?
 
-    /// 追问窗口：提问结束后这么多秒内到达的句子，算同一个问题的后半截。
+    /// 同一轮提问的间隔窗口：上一句结束后这么多秒内到达的句子，算同一轮。
     ///
     /// 这个判断之所以成立，是因为**本应用不采集麦克风**：这段时间里能被听到的
-    /// 只可能是面试官继续说，不可能是你开口回答。
-    private static let continuationWindow: TimeInterval = 2.5
-    /// 一个问题最多钉三段，再多就不是「别忘了问题」而是挡住字幕了
+    /// 只可能是面试官继续说，不可能是你开口回答。所以不看内容，自带问号的
+    /// 后半句也算同一轮。
+    ///
+    /// 定成 5 秒而不是更短：真人提问之间会停顿、会「嗯」一下、会翻简历，
+    /// 「说说你最近的项目……另外你怎么处理和上级的分歧」中间隔三四秒很正常。
+    /// 窗口太短就会把一轮里的后几个问题各自当成新问题，把前面的替换掉。
+    private static let continuationWindow: TimeInterval = 5
+    /// 一轮最多钉三段，再多就不是「别忘了问题」而是挡住字幕了。
+    /// 超出的句子不再显示，但**仍然算这一轮**（见 updatePin）。
     private static let maxPinnedSegments = 3
 
-    /// 钉住条要显示的内容。句子可能已被 maxLines 挤掉，所以用 compactMap。
+    /// 钉住条要显示的内容 —— 最后一轮提问。
     var pinnedQuestion: [CaptionLine] {
-        pinnedQuestionIDs.compactMap { id in lines.first { $0.id == id } }
+        captionLines(for: questionGroups.last ?? [])
+    }
+
+    /// 备忘录：本场每一轮提问，按时间升序。
+    /// 整组的句子都被 maxLines 挤掉之后会变成空数组，过滤掉。
+    var questionMemo: [[CaptionLine]] {
+        questionGroups.map(captionLines(for:)).filter { !$0.isEmpty }
+    }
+
+    /// 句子可能已被 maxLines 挤掉，所以用 compactMap。
+    private func captionLines(for ids: [UUID]) -> [CaptionLine] {
+        ids.compactMap { id in lines.first { $0.id == id } }
     }
 
     func startSession() {
         lines.removeAll()
         pendingSource = ""
-        pinnedQuestionIDs.removeAll()
+        questionGroups.removeAll()
         lastPinnedEndedAt = nil
         sessionStartedAt = Date()
     }
@@ -68,34 +87,32 @@ final class CaptionStore {
         updatePin(with: sentence)
     }
 
-    /// 钉住最近一个提问。不设过期时间：你答了五分钟，刚才那个问题仍然是「当前问题」，
-    /// 直到下一个问题出现才该被换掉。
+    /// 钉住最近一轮提问。不设过期时间：你答了五分钟，刚才那个问题仍然是「当前问题」，
+    /// 直到下一轮提问出现才该被换掉。
     ///
-    /// **先判追问，再判新问题** —— 顺序反了就会出现实测里的那个 bug：
+    /// **先判同一轮，再判新问题** —— 顺序反了就会出现实测里的那个 bug：
     /// "Tell me about X." / "And how would you handle it differently now?"
     /// 后半句自带问号，被当成新问题把前半句整个替换掉，钉住条最后只剩后半截，
-    /// 恰好和这个功能的目的相反。紧挨着的两句本来就是同一个问题。
+    /// 恰好和这个功能的目的相反。紧挨着的两句本来就是同一轮。
     private func updatePin(with sentence: Sentence) {
-        if isContinuation(of: sentence) {
-            pinnedQuestionIDs.append(sentence.id)
+        if isSameRound(as: sentence) {
+            // 满了就不再显示这一句，但时间窗**照样推进** —— 否则一轮里的第 4 句
+            // 会掉到下面的分支，被当成新问题另起一组，把前三句整个挤走。
+            if let last = questionGroups.indices.last,
+               questionGroups[last].count < Self.maxPinnedSegments {
+                questionGroups[last].append(sentence.id)
+            }
             lastPinnedEndedAt = sentence.endedAt
             return
         }
         guard QuestionDetector.isQuestion(sentence.text) else { return }
-        pinnedQuestionIDs = [sentence.id]
+        questionGroups.append([sentence.id])
         lastPinnedEndedAt = sentence.endedAt
     }
 
-    /// 这一句是不是上一个提问的后半截。
-    ///
-    /// 判据是时间：提问结束 `continuationWindow` 秒内到达。之所以够用，是因为
-    /// 本应用**不采集麦克风** —— 这段时间里能被听到的只可能是面试官继续说，
-    /// 不可能是你开口回答。所以不看内容，自带问号的后半句也算追问。
-    private func isContinuation(of sentence: Sentence) -> Bool {
-        guard !pinnedQuestionIDs.isEmpty,
-              pinnedQuestionIDs.count < Self.maxPinnedSegments,
-              let end = lastPinnedEndedAt
-        else { return false }
+    /// 这一句是否还属于当前这一轮提问。判据只有时间，不看内容。
+    private func isSameRound(as sentence: Sentence) -> Bool {
+        guard !questionGroups.isEmpty, let end = lastPinnedEndedAt else { return false }
         return sentence.startedAt - end <= Self.continuationWindow
     }
 

@@ -66,6 +66,50 @@ final class PinnedQuestionTests: XCTestCase {
         XCTAssertEqual(s.pinnedQuestion.count, 3)
     }
 
+    /// 钉满三段之后，同一轮的第 4 句**不能**另起一组。
+    /// 否则「Tell me about X / 另外 Y / 还有 Z / 以及 W」会把前三个问题整个挤走，
+    /// 只剩最后那个 —— 和上面那个 bug 一样的失效方式。
+    func testFourthSegmentOfARoundDoesNotStartANewGroup() {
+        let s = store()
+        s.append(sentence("Tell me about your last project.", from: 0, to: 2))
+        s.append(sentence("Say the hardest part.", from: 2.2, to: 4))
+        s.append(sentence("And what you'd change.", from: 4.2, to: 6))
+        s.append(sentence("How would you scale it?", from: 6.2, to: 8))
+        XCTAssertEqual(s.questionMemo.count, 1)
+        XCTAssertTrue(s.pinnedQuestion[0].source.hasPrefix("Tell me"))
+    }
+
+    /// 真人提问之间会停顿三四秒，窗口放宽到 5 秒就是为了接住这种。
+    func testAFourSecondPauseIsStillTheSameRound() {
+        let s = store()
+        s.append(sentence("Tell me about your last project.", from: 0, to: 2))
+        s.append(sentence("And how do you handle disagreement with your manager?", from: 6, to: 9))
+        XCTAssertEqual(s.pinnedQuestion.count, 2)
+        XCTAssertEqual(s.questionMemo.count, 1)
+    }
+
+    // MARK: - 问题备忘录
+
+    /// 备忘录留着本场每一轮提问，钉住条只留最后一轮。
+    func testMemoKeepsEveryRoundWhilePinKeepsOnlyTheLast() {
+        let s = store()
+        s.append(sentence("Tell me about your last incident.", from: 0, to: 4))
+        s.append(sentence("I see.", from: 60, to: 61))
+        s.append(sentence("How did you scale the write path?", from: 120, to: 124))
+        XCTAssertEqual(s.questionMemo.count, 2)
+        XCTAssertEqual(s.questionMemo[0][0].source, "Tell me about your last incident.")
+        XCTAssertEqual(s.questionMemo[1][0].source, "How did you scale the write path?")
+        XCTAssertEqual(s.pinnedQuestion.map(\.source), ["How did you scale the write path?"])
+    }
+
+    func testStartSessionClearsTheMemo() {
+        let s = store()
+        s.append(sentence("How did you find the bottleneck?", from: 0, to: 3))
+        XCTAssertEqual(s.questionMemo.count, 1)
+        s.startSession()
+        XCTAssertTrue(s.questionMemo.isEmpty)
+    }
+
     func testStartSessionClearsThePin() {
         let s = store()
         s.append(sentence("How did you find the bottleneck?", from: 0, to: 3))

@@ -12,7 +12,11 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
-    CODE_SIGN_STYLE: Automatic
+    # 自签名证书。用固定身份签名，TCC 的授权就绑在证书上而不是二进制哈希上，
+    # 重新构建不再被当成一个新 App，屏幕录制权限不会每次被吊销。
+    CODE_SIGN_STYLE: Manual
+    # 证书名刻意取成无意义的：签名里会带这个字符串，发出去的包不该带作者名字
+    CODE_SIGN_IDENTITY: "Leon Build"
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
     GCC_WARN_INHIBIT_ALL_WARNINGS: NO
@@ -46,7 +50,9 @@ targets:
     sources:
       - path: Tests/AwesomeRealtimeTranslatorTests
       - path: Sources/AwesomeRealtimeTranslator/Segmentation/Segmenter.swift
+      - path: Sources/AwesomeRealtimeTranslator/Segmentation/QuestionDetector.swift
       - path: Sources/AwesomeRealtimeTranslator/Transcription/Transcriber.swift
+      - path: Sources/AwesomeRealtimeTranslator/Caption/CaptionStore.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.leon.AwesomeRealtimeTranslatorTests

@@ -69,6 +69,16 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            VStack(alignment: .leading, spacing: 2) {
+                Toggle("把当前问题钉在顶部", isOn: Binding(
+                    get: { settings.pinQuestion },
+                    set: { settings.pinQuestion = $0 }
+                ))
+                Text("答到一半忘了问题的后半截时，抬头就能看到")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Stepper(
                 "显示行数 \(settings.visibleLines)",
                 value: Binding(get: { settings.visibleLines }, set: { settings.visibleLines = $0 }),

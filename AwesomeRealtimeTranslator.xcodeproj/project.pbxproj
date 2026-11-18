@@ -11,11 +11,14 @@
 		09BCD616A7A1C78E543A1C7F /* Transcriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814E99D79545E7E924051060 /* Transcriber.swift */; };
 		11DBBED5963589BBF56A0DF1 /* StreamingText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70DF7F8AB950944E709D3CC7 /* StreamingText.swift */; };
 		1DE8B8428CCA34C83B74D785 /* Segmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116A00130E319EE813814ACE /* Segmenter.swift */; };
+		1EE6487BAB1A38ED7A95ACAC /* PinnedQuestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC5661CDB013B2176C17C1A /* PinnedQuestionTests.swift */; };
 		2B0E3051B15D081660024861 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CE4BE8CBAC250246F03559B /* SettingsView.swift */; };
 		31243B3561D54FDC88A0E190 /* HotKeyCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEBAC292A062A36F95890766 /* HotKeyCenter.swift */; };
 		3A7DBA33A7B6D4B8DDE68152 /* Transcriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814E99D79545E7E924051060 /* Transcriber.swift */; };
 		41F342F80F13622CA37EEC37 /* SegmenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC51F346358A4099E9A3A845 /* SegmenterTests.swift */; };
+		4B0369F8A489CF335CD7A614 /* CaptionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EC8358EA2A67092AC7057F2 /* CaptionStore.swift */; };
 		5E6B76FA749608545CA1D4C0 /* Translator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 639F302452EDF58341F3C139 /* Translator.swift */; };
+		5EFA302826391C63F8B4071D /* QuestionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7F20DDEE00DE6189139514 /* QuestionDetector.swift */; };
 		67717BA6A5B5DE1113C451D4 /* Permissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE13CCF2ACF2670346120EDE /* Permissions.swift */; };
 		6C58BCE50856AA39B9AC96EB /* Segmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116A00130E319EE813814ACE /* Segmenter.swift */; };
 		798132AFD3226DB5E4DDA76D /* CaptionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EC8358EA2A67092AC7057F2 /* CaptionStore.swift */; };
@@ -23,6 +26,7 @@
 		9B38F17A3D2881DC8759F6CA /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D8FE84B9D44B9EEAEC3E939 /* Log.swift */; };
 		9F62032409DD40ED77622A6A /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E370225C17C96D2594511BC2 /* MenuBarView.swift */; };
 		B9F2323FADB00846FA838EB5 /* SettingsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA58C00461B358C2044A943E /* SettingsWindow.swift */; };
+		C1016D71E1E5F149FCF5853C /* QuestionDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC49A6DD3A5AC23D0A6084F8 /* QuestionDetectorTests.swift */; };
 		CCD44B2942DEFA36A195A0DA /* AppleTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BD280CB90716CE7A0DAACA /* AppleTranslator.swift */; };
 		CFFB8243FD2EBD101AE4B854 /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8571F86EF8452A12BCEA8580 /* AppCoordinator.swift */; };
 		DD08D8E6677A15B8D93963F5 /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D72D1255D87E9E6DE5AEC3F /* SystemAudioCapture.swift */; };
@@ -34,6 +38,7 @@
 		EA0AF8D4384194E42739150A /* AwesomeRealtimeTranslatorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6CEE58394A268C9F050857 /* AwesomeRealtimeTranslatorApp.swift */; };
 		EE0BF5E089B619134BE1A5F6 /* CaptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10B27AE97BBE0ED7A32484C /* CaptionView.swift */; };
 		F95F596A37CB023D8754039E /* OnboardingWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B937985CC362EEFAEA50950 /* OnboardingWindow.swift */; };
+		FBFF445E4153C29D0857FDAA /* QuestionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7F20DDEE00DE6189139514 /* QuestionDetector.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -57,8 +62,11 @@
 		9EC8358EA2A67092AC7057F2 /* CaptionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionStore.swift; sourceTree = "<group>"; };
 		9FE2B2B4F193877448D39895 /* SpeechAnalyzerTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechAnalyzerTranscriber.swift; sourceTree = "<group>"; };
 		AE13CCF2ACF2670346120EDE /* Permissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Permissions.swift; sourceTree = "<group>"; };
+		AE7F20DDEE00DE6189139514 /* QuestionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuestionDetector.swift; sourceTree = "<group>"; };
+		BC49A6DD3A5AC23D0A6084F8 /* QuestionDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuestionDetectorTests.swift; sourceTree = "<group>"; };
 		C4D1F7B13CCE03ABB7834CB8 /* SessionArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionArchive.swift; sourceTree = "<group>"; };
 		CC51F346358A4099E9A3A845 /* SegmenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SegmenterTests.swift; sourceTree = "<group>"; };
+		DDC5661CDB013B2176C17C1A /* PinnedQuestionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedQuestionTests.swift; sourceTree = "<group>"; };
 		E10B27AE97BBE0ED7A32484C /* CaptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionView.swift; sourceTree = "<group>"; };
 		E370225C17C96D2594511BC2 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		F64B5DFE8A73815A223E4D07 /* AwesomeRealtimeTranslatorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AwesomeRealtimeTranslatorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -90,6 +98,8 @@
 		77207D4D90BC87233A7782CF /* AwesomeRealtimeTranslatorTests */ = {
 			isa = PBXGroup;
 			children = (
+				DDC5661CDB013B2176C17C1A /* PinnedQuestionTests.swift */,
+				BC49A6DD3A5AC23D0A6084F8 /* QuestionDetectorTests.swift */,
 				CC51F346358A4099E9A3A845 /* SegmenterTests.swift */,
 			);
 			path = AwesomeRealtimeTranslatorTests;
@@ -143,6 +153,7 @@
 		BBEAFD7B14385F64DE4D9C06 /* Segmentation */ = {
 			isa = PBXGroup;
 			children = (
+				AE7F20DDEE00DE6189139514 /* QuestionDetector.swift */,
 				116A00130E319EE813814ACE /* Segmenter.swift */,
 			);
 			path = Segmentation;
@@ -268,10 +279,10 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					0665667078662D0A0C120C8E = {
-						ProvisioningStyle = Automatic;
+						ProvisioningStyle = Manual;
 					};
 					DBDC5A0B43F78A510B19D5EC = {
-						ProvisioningStyle = Automatic;
+						ProvisioningStyle = Manual;
 					};
 				};
 			};
@@ -325,6 +336,7 @@
 				9F62032409DD40ED77622A6A /* MenuBarView.swift in Sources */,
 				F95F596A37CB023D8754039E /* OnboardingWindow.swift in Sources */,
 				67717BA6A5B5DE1113C451D4 /* Permissions.swift in Sources */,
+				5EFA302826391C63F8B4071D /* QuestionDetector.swift in Sources */,
 				1DE8B8428CCA34C83B74D785 /* Segmenter.swift in Sources */,
 				E60407CBE8960BF6392B9E86 /* SessionArchive.swift in Sources */,
 				2B0E3051B15D081660024861 /* SettingsView.swift in Sources */,
@@ -341,6 +353,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4B0369F8A489CF335CD7A614 /* CaptionStore.swift in Sources */,
+				1EE6487BAB1A38ED7A95ACAC /* PinnedQuestionTests.swift in Sources */,
+				FBFF445E4153C29D0857FDAA /* QuestionDetector.swift in Sources */,
+				C1016D71E1E5F149FCF5853C /* QuestionDetectorTests.swift in Sources */,
 				6C58BCE50856AA39B9AC96EB /* Segmenter.swift in Sources */,
 				41F342F80F13622CA37EEC37 /* SegmenterTests.swift in Sources */,
 				09BCD616A7A1C78E543A1C7F /* Transcriber.swift in Sources */,
@@ -401,7 +417,8 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Leon Build";
+				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -497,7 +514,8 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Leon Build";
+				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;

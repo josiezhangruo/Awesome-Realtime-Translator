@@ -81,6 +81,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
             HotKeyCenter.shared.unregisterAll()
+
+            // 直接退出会绕过 stop()，整场记录就丢了 —— 字幕窗上的电源按钮和菜单栏的
+            // 「退出」都是 NSApp.terminate，而退出前用户几乎不会先按一下暂停。
+            // 这里只做落盘（同步写文件），不等 stop() 的异步 teardown：
+            // 代价是最后一句没定稿的话不会被冲刷出来，换退出路径上的确定性。
+            let coordinator = AppCoordinator.shared
+            if coordinator.settings.saveTranscripts, !coordinator.store.lines.isEmpty {
+                SessionArchive.save(
+                    markdown: coordinator.store.markdown,
+                    startedAt: coordinator.store.sessionStartedAt ?? Date()
+                )
+            }
         }
     }
 }

@@ -46,6 +46,7 @@ targets:
     sources:
       - path: Tests/AwesomeRealtimeTranslatorTests
       - path: Sources/AwesomeRealtimeTranslator/Segmentation/Segmenter.swift
+      - path: Sources/AwesomeRealtimeTranslator/Segmentation/QuestionDetector.swift
       - path: Sources/AwesomeRealtimeTranslator/Transcription/Transcriber.swift
     settings:
       base:

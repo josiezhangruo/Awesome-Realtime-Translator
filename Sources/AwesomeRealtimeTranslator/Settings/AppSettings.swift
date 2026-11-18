@@ -43,6 +43,12 @@ final class AppSettings {
     var visibleLines: Int { didSet { persist(visibleLines, "visibleLines") } }
     var clickThrough: Bool { didSet { persist(clickThrough, "clickThrough") } }
 
+    /// 把最近一个提问钉在字幕窗顶部，直到下一个提问出现。
+    ///
+    /// 面试里最常见的翻车不是没听懂，是听懂了、答到一半，忘了问题的后半截——
+    /// 而字幕是往上滚的，你一开口它就滚走了。默认开启。
+    var pinQuestion: Bool { didSet { persist(pinQuestion, "pinQuestion") } }
+
     /// 原文显现节奏：把一批到达的字摊开播放的时长（秒），也等于显示比识别结果滞后多少。
     ///
     /// 识别模型每 ~950ms 吐一批结果，这个值决定怎么花掉这段时间：
@@ -78,6 +84,7 @@ final class AppSettings {
         opacity = defaults.object(forKey: "opacity") as? Double ?? 0.82
         visibleLines = defaults.object(forKey: "visibleLines") as? Int ?? 3
         clickThrough = defaults.object(forKey: "clickThrough") as? Bool ?? false
+        pinQuestion = defaults.object(forKey: "pinQuestion") as? Bool ?? true
         revealPace = min(1.0, max(0.3, defaults.object(forKey: "revealPace") as? Double ?? 0.5))
         hideFromScreenSharing = defaults.object(forKey: "hideFromScreenSharing") as? Bool ?? true
         glossary = defaults.stringArray(forKey: "glossary") ?? []

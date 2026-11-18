@@ -19,6 +19,7 @@ struct CaptionView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider().opacity(0.25)
+            pinnedQuestionBar
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -81,6 +82,50 @@ struct CaptionView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .contentShape(Rectangle())
+    }
+
+    // MARK: - 钉住的当前问题
+
+    /// 固定在正文上方，不参与滚动。
+    ///
+    /// 面试里最常见的翻车是答到一半忘了问题的后半截，而字幕是往上滚的 ——
+    /// 你一开口它就滚走了。所以这一条必须在滚动区**之外**。
+    @ViewBuilder
+    private var pinnedQuestionBar: some View {
+        let pinned = store.pinnedQuestion
+        if settings.pinQuestion, !pinned.isEmpty {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "questionmark.circle.fill")
+                    .font(.system(size: settings.fontSize - 5, weight: .semibold))
+                    .foregroundStyle(Color.green.opacity(0.75))
+                    .padding(.top, 2)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    if settings.displayMode.showsSource {
+                        Text(pinned.map(\.source).joined(separator: " "))
+                            .font(.system(size: settings.fontSize - 2, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .textSelection(.enabled)
+                    }
+                    if settings.displayMode.showsTranslation {
+                        // 译文可能还没回来，这里不占位：钉住条本来就是额外多出来的一块，
+                        // 让它随译文长高一次，比先撑开一行空白更不碍事。
+                        let translated = pinned.compactMap(\.translation).joined(separator: " ")
+                        if !translated.isEmpty {
+                            Text(translated)
+                                .font(.system(size: settings.fontSize - 1, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.95))
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Color.green.opacity(0.1))
+            .overlay(alignment: .bottom) { Divider().opacity(0.25) }
+        }
     }
 
     // MARK: - 字幕正文

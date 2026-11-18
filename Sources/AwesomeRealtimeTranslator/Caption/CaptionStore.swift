@@ -28,9 +28,31 @@ final class CaptionStore {
 
     private let maxLines = 2000
 
+    // MARK: - 钉住当前问题
+
+    /// 当前被钉住的提问，按说出顺序。存 id 而不是文本，这样译文回来时钉住条会自己更新。
+    private(set) var pinnedQuestionIDs: [UUID] = []
+    /// 最后一段被钉住的话结束的时间，用来判断下一句是不是同一个问题的后半截
+    private var lastPinnedEndedAt: TimeInterval?
+
+    /// 追问窗口：提问结束后这么多秒内到达的句子，算同一个问题的后半截。
+    ///
+    /// 这个判断之所以成立，是因为**本应用不采集麦克风**：这段时间里能被听到的
+    /// 只可能是面试官继续说，不可能是你开口回答。
+    private static let continuationWindow: TimeInterval = 2.5
+    /// 一个问题最多钉三段，再多就不是「别忘了问题」而是挡住字幕了
+    private static let maxPinnedSegments = 3
+
+    /// 钉住条要显示的内容。句子可能已被 maxLines 挤掉，所以用 compactMap。
+    var pinnedQuestion: [CaptionLine] {
+        pinnedQuestionIDs.compactMap { id in lines.first { $0.id == id } }
+    }
+
     func startSession() {
         lines.removeAll()
         pendingSource = ""
+        pinnedQuestionIDs.removeAll()
+        lastPinnedEndedAt = nil
         sessionStartedAt = Date()
     }
 
@@ -43,6 +65,26 @@ final class CaptionStore {
             wallClock: Date()
         ))
         if lines.count > maxLines { lines.removeFirst(lines.count - maxLines) }
+        updatePin(with: sentence)
+    }
+
+    /// 钉住最近一个提问。不设过期时间：你答了五分钟，刚才那个问题仍然是「当前问题」，
+    /// 直到下一个问题出现才该被换掉。
+    private func updatePin(with sentence: Sentence) {
+        if QuestionDetector.isQuestion(sentence.text) {
+            pinnedQuestionIDs = [sentence.id]
+            lastPinnedEndedAt = sentence.endedAt
+            return
+        }
+        // 两段式问题的后半截：「...and how would you do it differently now」
+        // 本身不是疑问句，但紧接在提问之后，丢了它就等于丢了半个问题。
+        guard !pinnedQuestionIDs.isEmpty,
+              pinnedQuestionIDs.count < Self.maxPinnedSegments,
+              let end = lastPinnedEndedAt,
+              sentence.startedAt - end <= Self.continuationWindow
+        else { return }
+        pinnedQuestionIDs.append(sentence.id)
+        lastPinnedEndedAt = sentence.endedAt
     }
 
     func setTranslation(_ text: String, for id: UUID) {

@@ -126,12 +126,19 @@ public sealed class WhisperTranscriber : ITranscriber
         }
         catch (DllNotFoundException ex)
         {
-            // 单文件发布会把 whisper 的原生库解压到临时目录再加载。
-            // 杀毒软件拦截、临时目录没有写权限、缺 VC++ 运行库，都会走到这里。
+            // 0.1.2 起原生库就放在 exe 旁边的 runtimes\<架构>\ 里，不再自解压到临时目录，
+            // 所以到这里只剩两种可能，而且能当场分辨：目录在不在。
+            // （0.1.2 的提示文字还在说「杀软拦截了解压出来的组件」，那是 0.1.1 的世界，
+            //   已经不成立了，会把人引到错误的方向上去。）
+            string runtimes = Path.Combine(AppContext.BaseDirectory, "runtimes");
+            string hint = Directory.Exists(runtimes)
+                ? "组件文件夹是在的，那多半是杀毒软件把里面的 dll 隔离了。\n" +
+                  "把整个程序文件夹加入杀毒软件的信任列表，然后重试。"
+                : $"找不到 {runtimes}。\n" +
+                  "整个文件夹要保持原样，不能只把 exe 单独拖出来——重新完整解压一次安装包。";
+
             throw new TranscriberException(
-                "语音识别组件加载失败，系统找不到它需要的原生库。\n" +
-                "常见原因：杀毒软件拦截了程序解压出来的组件。把本程序加入信任后重试。\n" +
-                $"（{ex.Message}）",
+                $"语音识别组件加载失败，系统找不到它需要的原生库。\n{hint}\n（{ex.Message}）",
                 ex);
         }
         catch (Exception ex) when (ex is not TranscriberException)

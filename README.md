@@ -159,7 +159,7 @@ An honest dividing line. Do not read the two lists as one.
 Written and feature-matched to the macOS version; the code lives in
 [`windows/`](windows/README.md).
 
-**[Download the beta (389 MB)](https://github.com/yangli-0409/Awesome-Realtime-Translator/releases/tag/v0.1.2-windows-beta)** · needs Windows 10 2004 or newer
+**[Download the beta (389 MB)](https://github.com/yangli-0409/Awesome-Realtime-Translator/releases/tag/v0.1.3-windows-beta)** · needs Windows 10 2004 or newer
 
 Keep the extracted folder intact — the models and native components have to sit next to the
 executable. There is no code-signing certificate, so Windows will warn about an unknown

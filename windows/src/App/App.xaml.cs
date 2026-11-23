@@ -41,6 +41,18 @@ public partial class App : System.Windows.Application
         string? whisperModel = ModelPaths.FindWhisperModel();
         string? translationModel = ModelPaths.FindTranslationModel();
 
+        Diagnostics.Log.WriteStartupBanner(whisperModel, translationModel);
+
+        // 后台线程上没人接的异常会静默杀掉进程，对用户就是「突然就没了」。
+        // 至少先记下来。
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            Diagnostics.Log.Error("未处理的异常", e.ExceptionObject as Exception);
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            Diagnostics.Log.Error("未观察的任务异常", e.Exception);
+            e.SetObserved();
+        };
+
         _pipeline = new SessionPipeline(
             _store,
             _settings,
@@ -53,7 +65,9 @@ public partial class App : System.Windows.Application
                     "找不到翻译模型。",
                     $"把 opus-mt-en-zh 目录放到 {Path.Combine(AppContext.BaseDirectory, "models")} 下面。")
                 : new MarianTranslator(translationModel),
-            action => Dispatcher.Invoke(action));
+            action => Dispatcher.Invoke(action),
+            time: null,
+            log: (message, ex) => Diagnostics.Log.Error(message, ex));
 
         _caption = new CaptionWindow(
             _store,
@@ -92,6 +106,8 @@ public partial class App : System.Windows.Application
         menu.Items.Add("导出为 Markdown…", null, (_, _) => ExportTranscript());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("设置…", null, (_, _) => OpenSettings());
+        // 出问题时让用户能一键找到日志贴给我，而不是去翻 %APPDATA%
+        menu.Items.Add("打开日志文件夹", null, (_, _) => OpenLogFolder());
         menu.Items.Add("退出", null, (_, _) => Quit());
 
         _tray.ContextMenuStrip = menu;
@@ -180,6 +196,24 @@ public partial class App : System.Windows.Application
     }
 
     private void OpenSettings() => SettingsWindow.Show(_settings, ModelPaths.DescribeLocation());
+
+    private void OpenLogFolder()
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(Diagnostics.Log.Directory);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = Diagnostics.Log.Directory,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error("打开日志目录失败", ex);
+            _store.StatusMessage = $"日志在：{Diagnostics.Log.FilePath}";
+        }
+    }
 
     private void CopyTranscript()
     {

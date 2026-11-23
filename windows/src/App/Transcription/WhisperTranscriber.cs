@@ -68,13 +68,26 @@ public sealed class WhisperTranscriber : ITranscriber
 
     public event Action<TranscriptEvent>? Event;
 
-    public Task PrepareAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    // 必须是 async：原来写成同步方法 + try 包住 Task.Run，而 Task.Run 是立刻返回的，
+    // 真正的异常在 await 的时候才浮出来，根本不经过那个 catch。于是模型加载失败时
+    // 抛出去的是 Whisper.net 的原始异常，既没有上下文也不告诉用户该怎么办。
+    public async Task PrepareAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default)
     {
         if (!File.Exists(_modelPath))
         {
             throw new TranscriberException(
                 $"找不到语音识别模型：{_modelPath}\n" +
-                "正常安装包里自带模型。如果你是自己从源码构建的，运行 tools/fetch-models.ps1 下载。");
+                "检查一下 models 文件夹是不是和 exe 放在一起了。");
+        }
+
+        long size = new FileInfo(_modelPath).Length;
+        if (size < MinPlausibleModelBytes)
+        {
+            // 下载中断或解压失败留下的半截文件。不提前拦的话，
+            // 用户会看到一句来自 native 层、完全看不懂的错误。
+            throw new TranscriberException(
+                $"语音识别模型只有 {size / 1024 / 1024} MB，不完整（正常约 142 MB）。\n" +
+                "多半是下载或解压中断了，重新解压一次安装包。");
         }
 
         progress?.Report("正在加载语音识别模型…");
@@ -83,7 +96,7 @@ public sealed class WhisperTranscriber : ITranscriber
         {
             // 加载是 CPU 密集的同步调用（base 模型约 1~3 秒），放到线程池上，
             // 否则会把 UI 线程卡住，用户会以为点了没反应。
-            return Task.Run(
+            await Task.Run(
                 () =>
                 {
                     WhisperFactory factory = WhisperFactory.FromPath(_modelPath);
@@ -105,13 +118,30 @@ public sealed class WhisperTranscriber : ITranscriber
                         _processor = processor;
                     }
                 },
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (DllNotFoundException ex)
+        {
+            // 单文件发布会把 whisper 的原生库解压到临时目录再加载。
+            // 杀毒软件拦截、临时目录没有写权限、缺 VC++ 运行库，都会走到这里。
+            throw new TranscriberException(
+                "语音识别组件加载失败，系统找不到它需要的原生库。\n" +
+                "常见原因：杀毒软件拦截了程序解压出来的组件。把本程序加入信任后重试。\n" +
+                $"（{ex.Message}）",
+                ex);
         }
         catch (Exception ex) when (ex is not TranscriberException)
         {
             throw new TranscriberException($"语音识别模型加载失败：{ex.Message}", ex);
         }
     }
+
+    /// <summary>比这还小的模型文件一定是坏的。最小的 tiny 模型也有 74MB。</summary>
+    private const long MinPlausibleModelBytes = 60L * 1024 * 1024;
 
     public Task StartAsync(CancellationToken cancellationToken = default)
     {

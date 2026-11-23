@@ -41,6 +41,12 @@ public sealed class SessionPipeline : IAsyncDisposable
     private readonly Action<Action> _toUiThread;
     private readonly TimeProvider _time;
 
+    /// <summary>
+    /// 失败日志的出口。Core 不认识任何具体的日志实现，由 App 注入。
+    /// 不注入就什么也不记——单测用的就是这条路径。
+    /// </summary>
+    private readonly Action<string, Exception?> _log;
+
     private IAudioSource? _audio;
     private ITranscriber? _transcriber;
     private ITranslator? _translator;
@@ -60,7 +66,8 @@ public sealed class SessionPipeline : IAsyncDisposable
         Func<ITranscriber> transcriberFactory,
         Func<ITranslator> translatorFactory,
         Action<Action> toUiThread,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        Action<string, Exception?>? log = null)
     {
         _store = store;
         _settings = settings;
@@ -69,6 +76,7 @@ public sealed class SessionPipeline : IAsyncDisposable
         _translatorFactory = translatorFactory;
         _toUiThread = toUiThread;
         _time = time ?? TimeProvider.System;
+        _log = log ?? ((_, _) => { });
     }
 
     public PipelineState State { get; private set; } = PipelineState.Idle;
@@ -124,6 +132,7 @@ public sealed class SessionPipeline : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            _log("识别器准备失败", ex);
             transcriber.Event -= OnTranscriptEvent;
             await transcriber.DisposeAsync().ConfigureAwait(false);
             Fail(ex.Message);
@@ -145,6 +154,7 @@ public sealed class SessionPipeline : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            _log("翻译引擎降级为仅原文", ex);
             await translator.DisposeAsync().ConfigureAwait(false);
             _translator = new PassthroughTranslator();
             _usesRealTranslator = false;
@@ -162,6 +172,7 @@ public sealed class SessionPipeline : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            _log("识别器启动失败", ex);
             Fail(ex.Message);
             await TeardownAsync().ConfigureAwait(false);
             return;
@@ -177,11 +188,11 @@ public sealed class SessionPipeline : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            _log("音频采集启动失败", ex);
             audio.ChunkAvailable -= OnChunk;
             audio.Failed -= OnAudioFailed;
             await audio.DisposeAsync().ConfigureAwait(false);
             Fail(ex.Message);
-            _toUiThread(() => _store.StatusMessage = ex.Message);
             await TeardownAsync().ConfigureAwait(false);
             return;
         }
@@ -281,11 +292,13 @@ public sealed class SessionPipeline : IAsyncDisposable
 
     private void OnChunk(AudioChunk chunk) => _transcriber?.Append(chunk);
 
-    private void OnAudioFailed(Exception ex) => _toUiThread(() =>
+    // 带上下文的消息整句传给 Fail，别自己先写一遍 StatusMessage——
+    // 那样两处都在管同一个字段，很容易再次写出互相覆盖的 bug。
+    private void OnAudioFailed(Exception ex)
     {
-        _store.StatusMessage = $"音频采集中断：{ex.Message}";
-        Fail(ex.Message);
-    });
+        _log("音频采集中断", ex);
+        Fail($"音频采集中断：{ex.Message}");
+    }
 
     private void OnTranscriptEvent(TranscriptEvent evt)
     {
@@ -374,8 +387,9 @@ public sealed class SessionPipeline : IAsyncDisposable
                     {
                         return;
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        _log("单句翻译失败", ex);
                         _toUiThread(() => _store.MarkTranslationFailed(sentence.Id));
                     }
                 }
@@ -452,9 +466,19 @@ public sealed class SessionPipeline : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// 会话失败：把原因显示给用户，并切到 Failed。
+    ///
+    /// 这里<b>必须覆盖</b> StatusMessage，不能用 <c>??=</c>。
+    /// 原来写的是 <c>??=</c>，而准备阶段的进度回调早就把它写成了
+    /// 「正在加载语音识别模型…」，于是真正的错误一个字都显示不出来——
+    /// 线上反馈的「一直卡在加载中、不报错也不翻译」就是这么来的。
+    ///
+    /// 想带上下文的调用方，把修饰好的整句话传进来，不要自己先写一遍 StatusMessage。
+    /// </summary>
     private void Fail(string message)
     {
-        _toUiThread(() => _store.StatusMessage ??= message);
+        _toUiThread(() => _store.StatusMessage = message);
         SetState(PipelineState.Failed);
     }
 

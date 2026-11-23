@@ -62,8 +62,16 @@ public class SessionPipelineTests
 
         public Exception? PrepareError { get; init; }
 
+        /// <summary>失败之前先报一条进度，模拟真实识别器「先说正在加载、再失败」的顺序。</summary>
+        public string? ProgressBeforeError { get; init; }
+
         public Task PrepareAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default)
         {
+            if (ProgressBeforeError is not null)
+            {
+                progress?.Report(ProgressBeforeError);
+            }
+
             if (PrepareError is not null)
             {
                 return Task.FromException(PrepareError);
@@ -276,6 +284,98 @@ public class SessionPipelineTests
         Assert.Equal(PipelineState.Failed, pipeline.State);
         Assert.False(audio.Started, "识别器都没起来，不该去开麦");
         Assert.Equal("模型文件找不到", store.StatusMessage);
+    }
+
+    [Fact]
+    public async Task FailureAfterAProgressReportStillShowsTheError()
+    {
+        // 线上反馈的 bug：Windows 版一直卡在「正在加载语音识别模型…」，不报错也不翻译。
+        //
+        // 原因是 Fail() 用了 ??=，而进度回调已经把 StatusMessage 写成了「正在加载…」，
+        // 于是真正的错误一个字都没显示出来，用户只看到一条永远不消失的加载提示。
+        //
+        // 这条用例把顺序钉死：先报进度、再失败，最终屏幕上必须是错误，不是进度。
+        var transcriber = new FakeTranscriber
+        {
+            ProgressBeforeError = "正在加载语音识别模型…",
+            PrepareError = new TranscriberException("模型文件损坏"),
+        };
+        (SessionPipeline pipeline, CaptionStore store, _, _, _) = Build(transcriber: transcriber);
+
+        await pipeline.StartAsync();
+
+        Assert.Equal(PipelineState.Failed, pipeline.State);
+        Assert.NotNull(store.StatusMessage);
+        Assert.DoesNotContain("正在加载", store.StatusMessage);
+        Assert.Contains("模型文件损坏", store.StatusMessage);
+    }
+
+    [Fact]
+    public async Task TranslatorFailureAfterProgressStillShowsTheDegradeNotice()
+    {
+        // 同一个坑的另一半：翻译器也会先报「正在加载翻译模型…」再失败。
+        // 那条路径用的是直接赋值不是 ??=，但一并钉住，免得以后被改回去。
+        var translator = new FakeTranslator
+        {
+            PrepareError = new TranslatorException("翻译模型不完整"),
+        };
+        (SessionPipeline pipeline, CaptionStore store, _, _, _) = Build(translator: translator);
+
+        await pipeline.StartAsync();
+
+        Assert.Equal(PipelineState.Running, pipeline.State);
+        Assert.Contains("只显示原文", store.StatusMessage);
+        Assert.DoesNotContain("正在加载", store.StatusMessage);
+
+        await pipeline.StopAsync();
+    }
+
+    [Fact]
+    public async Task FailuresGoToTheLogCallbackWithTheException()
+    {
+        // 这个应用跑在我没有的操作系统上。用户只能看到一句中文提示，
+        // 真正能拿来排查的是日志里那个带堆栈的异常——所以这条路必须有测试守着。
+        var logged = new List<(string Message, Exception? Error)>();
+        var store = new CaptionStore();
+        var settings = new AppSettings(new InMemorySettingsStore());
+        var boom = new TranscriberException("原生库加载不了");
+        var transcriber = new FakeTranscriber
+        {
+            ProgressBeforeError = "正在加载语音识别模型…",
+            PrepareError = boom,
+        };
+
+        var pipeline = new SessionPipeline(
+            store,
+            settings,
+            () => new FakeAudioSource(),
+            () => transcriber,
+            () => new FakeTranslator(),
+            Inline,
+            time: null,
+            log: (m, e) => logged.Add((m, e)));
+
+        await pipeline.StartAsync();
+
+        (string message, Exception? error) = Assert.Single(logged);
+        Assert.Contains("识别器", message);
+        Assert.Same(boom, error);
+    }
+
+    [Fact]
+    public async Task AudioFailureKeepsItsOwnPrefix()
+    {
+        // 修 Fail() 的时候很容易把这条带上下文的消息覆盖成光秃秃的异常文本。
+        var audio = new FakeAudioSource
+        {
+            StartError = new InvalidOperationException("没有可用的音频输出设备"),
+        };
+        (SessionPipeline pipeline, CaptionStore store, _, _, _) = Build(audio: audio);
+
+        await pipeline.StartAsync();
+
+        Assert.Equal(PipelineState.Failed, pipeline.State);
+        Assert.Contains("没有可用的音频输出设备", store.StatusMessage);
     }
 
     [Fact]

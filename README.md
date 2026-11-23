@@ -159,7 +159,7 @@ An honest dividing line. Do not read the two lists as one.
 Written and feature-matched to the macOS version; the code lives in
 [`windows/`](windows/README.md).
 
-**[Download the beta (389 MB)](https://github.com/yangli-0409/Awesome-Realtime-Translator/releases/tag/v0.1.0-windows-beta)** · needs Windows 10 2004 or newer
+**[Download the beta (389 MB)](https://github.com/yangli-0409/Awesome-Realtime-Translator/releases/tag/v0.1.1-windows-beta)** · needs Windows 10 2004 or newer
 
 It is labelled beta because **nobody has actually run it on Windows yet**. The port was
 written on a Mac: it compiles to real Windows executables (verified for both x64 and arm64),

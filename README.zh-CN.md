@@ -136,7 +136,7 @@ Sources/AwesomeRealtimeTranslator/
 
 已经写完，功能和 macOS 版对齐，代码在 [`windows/`](windows/README.md)。
 
-**[下载 Beta（389 MB）](https://github.com/yangli-0409/Awesome-Realtime-Translator/releases/tag/v0.1.0-windows-beta)** · 需要 Windows 10 2004 及以上
+**[下载 Beta（389 MB）](https://github.com/yangli-0409/Awesome-Realtime-Translator/releases/tag/v0.1.1-windows-beta)** · 需要 Windows 10 2004 及以上
 
 标 Beta 是因为**这个版本从来没有在 Windows 上运行过**。移植是在一台 Mac 上完成的：
 代码能编译成真正的 Windows 可执行文件（x64 和 arm64 都验证过），83 个单测全过，

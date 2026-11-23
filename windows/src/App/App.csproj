@@ -14,7 +14,7 @@
     <!-- LibraryImport 源生成器产出的封送代码是 unsafe 的，必须打开 -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>Resources/app.ico</ApplicationIcon>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
 
     <!-- 在非 Windows 机器上也能编译（本项目就是在 macOS 上开发的）。 -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
@@ -27,10 +27,23 @@
     -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
 
-    <!-- 发布成单文件，和 macOS 版「拖进应用程序就能用」对齐 -->
+    <!--
+      自带 .NET 运行时，用户不需要装任何东西。托管程序集打进单个 exe，
+      启动时从内存加载，不落盘。
+
+      但原生库（whisper、onnxruntime）必须留在 exe 旁边，不能自解压：
+      IncludeNativeLibrariesForSelfExtract=true 会让 exe 每次启动把原生 dll
+      解压到 %TEMP%\.net\ 再加载，而「进程把可执行代码写进临时目录然后加载」
+      正是杀毒软件启发式规则里的典型 dropper 特征——0.1.0/0.1.1 被拦在
+      「正在加载语音识别模型…」就是这么来的。
+
+      而且这个设置本来就没换来任何好处：语音和翻译模型塞不进 exe，
+      models/ 必须跟 exe 同目录，所以用户拿到的从头到尾都是一个文件夹。
+      纯亏，关掉。
+    -->
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 

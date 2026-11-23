@@ -5,12 +5,17 @@
 .DESCRIPTION
   产出 publish/AwesomeRealtimeTranslator-<版本>-win-<架构>/，里面是：
 
-    AwesomeRealtimeTranslator.exe   单文件，自带 .NET 运行时
+    AwesomeRealtimeTranslator.exe   托管代码 + .NET 运行时
+    onnxruntime.dll 等原生库         翻译和 WPF 要用的，必须在 exe 旁边
+    runtimes/win-*/                 whisper 的原生库，Whisper.net 按这个路径找
     models/ggml-base.bin            语音识别模型
     models/opus-mt-en-zh/           翻译模型
     使用说明.txt
 
   模型随包一起发，不在运行时下载——理由见 fetch-models.ps1 的说明。
+
+  原生库不打进 exe（见 App.csproj 里 IncludeNativeLibrariesForSelfExtract 的注释）。
+  所以整个目录要保持原样分发，用户不能只把 exe 拖出来。
 
 .EXAMPLE
   pwsh tools/package.ps1
@@ -61,20 +66,25 @@ Write-Host "`n[3/3] 写说明并压缩 …" -ForegroundColor Cyan
 面试字幕 $version （Windows）
 
 怎么用
-  1. 双击 AwesomeRealtimeTranslator.exe
-  2. 字幕窗出现在屏幕顶部，点右上角 ▶ 开始听
-  3. 不需要任何权限，也不需要重启
+  1. 先把整个文件夹解压出来，放到一个固定位置（比如 D:\面试字幕\）
+  2. 双击 AwesomeRealtimeTranslator.exe
+  3. 字幕窗出现在屏幕顶部，点右上角 ▶ 开始听
+  4. 不需要任何权限，也不需要重启
 
   Ctrl+Alt+T  开始 / 暂停
   Ctrl+Alt+H  显示 / 隐藏字幕窗
 
 注意
-  * models 文件夹必须和 exe 放在一起，删了就跑不起来。
+  * 整个文件夹要保持原样，不要只把 exe 单独拖出来——models、runtimes
+    和那几个 dll 都得跟它在一起，少一个就跑不起来。
+    想要桌面快捷方式的话，右键 exe → 发送到 → 桌面快捷方式。
   * 第一次启动要加载模型，大约三到五秒。
   * 它只听电脑播放的声音，不听麦克风——听得到对方，听不到你自己。
   * 字幕窗不会出现在录屏和屏幕共享里。第一次用之前，建议自己用会议软件的
     共享预览确认一次。
   * 全程不联网。这个程序没有任何联网代码。
+  * 这个程序没有买代码签名证书，Windows 可能弹「未知发布者」，极少数杀毒
+    软件也可能误报。点「更多信息」→「仍要运行」。不放心就自己编译源码。
 
 免费 · MIT 开源
 https://github.com/yangli-0409/Awesome-Realtime-Translator

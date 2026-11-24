@@ -37,13 +37,30 @@ jobs:
       - name: 构建
         run: dotnet build windows/AwesomeRealtimeTranslator.slnx -c Release --no-restore
 
+      # 翻译测试要真实模型才跑得起来，不然自动 Skip——那样「绿」就不覆盖翻译链路。
+      # 只取翻译模型（237MB），不取 141MB 的语音模型：CPU runner 上跑 whisper 没意义。
+      - name: 翻译模型缓存
+        id: models
+        uses: actions/cache@v4
+        with:
+          path: windows/models/opus-mt-en-zh
+          key: opus-mt-en-zh-${{ hashFiles('windows/tools/fetch-models.ps1') }}
+
+      - name: 下载翻译模型
+        if: steps.models.outputs.cache-hit != 'true'
+        run: pwsh windows/tools/fetch-models.ps1 -TranslationOnly
+
       # 平台无关的那一半，在 Mac 上也跑，这里跑一遍是为了有单一的真相来源
       - name: 单元测试
         run: dotnet test windows/tests/Core.Tests/Core.Tests.csproj -c Release --no-build
 
-      # 这一步只有在真 Windows 上才有意义：WPF 在 macOS 上根本起不来
-      - name: 窗口构造测试
-        run: dotnet test windows/tests/App.Tests/App.Tests.csproj -c Release --no-build
+      # 这一步只有在真 Windows 上才有意义：WPF 在 macOS 上根本起不来。
+      # 里面包括真的截一次屏、确认字幕窗不在截图里——整个产品最关键的那条承诺。
+      # 用 detailed：截屏用例在截不到图的 runner 上会 Skip，必须能在日志里看见它到底跑了没有。
+      - name: 界面与 Win32 测试
+        run: >
+          dotnet test windows/tests/App.Tests/App.Tests.csproj -c Release --no-build
+          --logger "console;verbosity=detailed"
 
   # README 里写了「x64 和 arm64 都验证过」。那句话得有东西撑着。
   build-arm64:

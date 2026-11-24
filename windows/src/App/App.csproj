@@ -14,7 +14,7 @@
     <!-- LibraryImport 源生成器产出的封送代码是 unsafe 的，必须打开 -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>Resources/app.ico</ApplicationIcon>
-    <Version>0.1.5</Version>
+    <Version>0.2.0</Version>
 
     <!-- 在非 Windows 机器上也能编译（本项目就是在 macOS 上开发的）。 -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
@@ -67,6 +67,19 @@
 
   <ItemGroup>
     <ProjectReference Include="../Core/Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      图标必须同时是这两样东西：
+      - <ApplicationIcon>（上面）把它嵌进 exe 的 PE 资源，资源管理器和任务栏用这个。
+      - EmbeddedResource（这里）把它嵌进托管程序集，托盘图标用这个。
+
+      少了后者，LoadTrayIcon() 就只能去找输出目录下的 Resources/app.ico——
+      而 <ApplicationIcon> 从来不会把文件拷到输出目录，所以那条路径永远不存在，
+      托盘从 0.1.0 到 0.1.5 一直显示 Windows 通用图标。
+    -->
+    <EmbeddedResource Include="Resources/app.ico" />
   </ItemGroup>
 
   <ItemGroup>

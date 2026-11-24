@@ -64,14 +64,47 @@ public static class Log
     public static void WriteStartupBanner(string? whisperModel, string? translationModel)
     {
         Write("INFO ", new StringBuilder()
-            .Append("启动 ").Append(typeof(Log).Assembly.GetName().Version?.ToString() ?? "?")
+            .Append("启动 ").Append(AppVersion.Current)
             .Append("\n    OS: ").Append(Environment.OSVersion.VersionString)
             .Append("  64 位: ").Append(Environment.Is64BitOperatingSystem)
             .Append("  CPU 核: ").Append(Environment.ProcessorCount)
             .Append("\n    程序目录: ").Append(AppContext.BaseDirectory)
+            .Append("\n    所在磁盘: ").Append(DescribeDrive(AppContext.BaseDirectory))
             .Append("\n    识别模型: ").Append(Describe(whisperModel))
             .Append("\n    翻译模型: ").Append(Describe(translationModel))
             .ToString());
+    }
+
+    /// <summary>
+    /// 记一下程序装在什么盘上。
+    ///
+    /// <b>这行是为一个没查清的 bug 留的证据。</b>0.1.3 的线上日志里，程序放在
+    /// E: 盘时 whisper 加载模型连续两次抛 SEHException，整个文件夹复制到 C: 盘
+    /// 之后连续三次都正常。病因至今不明，而我没有 Windows 机器可以复现。
+    ///
+    /// 那就至少把盘的类型和文件系统记下来——下一次再有人踩到，就有东西可比：
+    /// 是不是都发生在可移动盘上？是不是都不是 NTFS？没有这一行，下一份日志
+    /// 还是只能靠猜，而这个项目已经为「靠猜」付过四个版本的代价了。
+    /// </summary>
+    private static string DescribeDrive(string path)
+    {
+        try
+        {
+            string? root = System.IO.Path.GetPathRoot(path);
+            if (string.IsNullOrEmpty(root))
+            {
+                return "读不出盘符";
+            }
+
+            var drive = new DriveInfo(root);
+
+            // DriveFormat 在盘未就绪时会抛，所以它单独放在最后、也在 try 里。
+            return $"{drive.Name} 类型 {drive.DriveType} 文件系统 {drive.DriveFormat}";
+        }
+        catch (Exception ex)
+        {
+            return $"读不出来（{ex.GetType().Name}）";
+        }
     }
 
     private static string Describe(string? path)

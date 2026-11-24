@@ -48,6 +48,7 @@ public partial class SettingsWindow : Window
         HideFromSharingBox.IsChecked = settings.HideFromScreenSharing;
         SaveTranscriptsBox.IsChecked = settings.SaveTranscripts;
         ModelPathText.Text = $"模型目录：{modelDirectory}";
+        VersionText.Text = $"版本 {AppVersion.Current}";
 
         // 必须在 UpdateLabels() 之前放开：UpdateLabels 自己带 _loading 守卫。
         // 到这里控件值都已经赋完，放开它不会再触发任何写配置的回调。

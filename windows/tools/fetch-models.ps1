@@ -11,6 +11,11 @@
 
 .EXAMPLE
   pwsh tools/fetch-models.ps1
+
+.EXAMPLE
+  # 只取翻译模型（约 237MB），跳过 141MB 的语音模型。
+  # CI 用这个：只有翻译测试需要真实模型，语音那边在 CI 上跑不动。
+  pwsh tools/fetch-models.ps1 -TranslationOnly
 #>
 
 [CmdletBinding()]
@@ -20,7 +25,11 @@ param(
     [ValidateSet('tiny', 'base', 'small', 'medium')]
     [string]$WhisperModel = 'base',
 
-    [switch]$Force
+    [switch]$Force,
+
+    # 只下翻译模型。给 CI 用：Core.Tests 里需要真实模型的只有翻译那几条，
+    # 多下 141MB 的语音模型纯属浪费缓存和时间。
+    [switch]$TranslationOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,11 +65,16 @@ function Get-File {
     }
 }
 
-Write-Host "`n[1/2] 语音识别模型 whisper-$WhisperModel" -ForegroundColor White
-Get-File `
-    -Url "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-$WhisperModel.bin" `
-    -Destination (Join-Path $models 'ggml-base.bin') `
-    -Label "ggml-$WhisperModel.bin"
+if ($TranslationOnly) {
+    Write-Host "`n[1/2] 语音识别模型 — 跳过（-TranslationOnly）" -ForegroundColor DarkGray
+}
+else {
+    Write-Host "`n[1/2] 语音识别模型 whisper-$WhisperModel" -ForegroundColor White
+    Get-File `
+        -Url "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-$WhisperModel.bin" `
+        -Destination (Join-Path $models 'ggml-base.bin') `
+        -Label "ggml-$WhisperModel.bin"
+}
 
 Write-Host "`n[2/2] 翻译模型 opus-mt-en-zh" -ForegroundColor White
 $mt = Join-Path $models 'opus-mt-en-zh'

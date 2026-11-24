@@ -114,7 +114,9 @@ public partial class App : System.Windows.Application
         _tray = new Forms.NotifyIcon
         {
             Visible = true,
-            Text = "面试字幕",
+
+            // 带上版本号：悬停就能看到自己装的是哪一版，不用去翻日志。
+            Text = $"面试字幕 {AppVersion.Current}",
             Icon = LoadTrayIcon(),
         };
 
@@ -134,14 +136,36 @@ public partial class App : System.Windows.Application
         _tray.DoubleClick += (_, _) => ToggleCaptionVisibility();
     }
 
-    private static System.Drawing.Icon LoadTrayIcon()
+    /// <summary>
+    /// 托盘图标。
+    ///
+    /// <b>0.2.0 修的。</b>原来是去 <c>输出目录/Resources/app.ico</c> 找文件，
+    /// 但 <c>&lt;ApplicationIcon&gt;</c> 只把图标嵌进 exe 的 PE 资源、
+    /// 从不把文件拷到输出目录，所以那条路径永远不存在，<c>File.Exists</c> 永远 false，
+    /// 托盘从 0.1.0 到 0.1.5 一直是 Windows 通用图标。
+    ///
+    /// 改成从托管程序集的嵌入资源里读：单文件发布照样在，而且 CI 测得到
+    /// （internal 就是为了这个）。按名字后缀找而不是写死全名，免得 RootNamespace
+    /// 一改就又悄悄退回通用图标——那正是上一个版本犯的错。
+    /// </summary>
+    internal static System.Drawing.Icon LoadTrayIcon()
     {
-        string path = Path.Combine(AppContext.BaseDirectory, "Resources", "app.ico");
         try
         {
-            if (File.Exists(path))
+            System.Reflection.Assembly assembly = typeof(App).Assembly;
+            string? name = Array.Find(
+                assembly.GetManifestResourceNames(),
+                n => n.EndsWith("app.ico", StringComparison.OrdinalIgnoreCase));
+
+            if (name is not null)
             {
-                return new System.Drawing.Icon(path);
+                using Stream? stream = assembly.GetManifestResourceStream(name);
+                if (stream is not null)
+                {
+                    // 指定小图标尺寸：ico 里有 16~256 七种，不挑的话托盘会拿到
+                    // 一张大图再缩，边缘发虚。
+                    return new System.Drawing.Icon(stream, Forms.SystemInformation.SmallIconSize);
+                }
             }
         }
         catch

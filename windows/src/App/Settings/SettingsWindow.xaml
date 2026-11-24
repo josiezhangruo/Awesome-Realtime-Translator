@@ -132,6 +132,8 @@
                            Text="快捷键：Ctrl+Alt+T 开始/暂停，Ctrl+Alt+H 显示/隐藏字幕窗。" />
                 <TextBlock FontSize="11" Foreground="#93A3B4" TextWrapping="Wrap" Margin="0,6,0,0"
                            x:Name="ModelPathText" />
+                <TextBlock FontSize="11" Foreground="#93A3B4" TextWrapping="Wrap" Margin="0,6,0,0"
+                           x:Name="VersionText" />
             </StackPanel>
         </Border>
 

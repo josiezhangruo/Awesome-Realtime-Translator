@@ -29,11 +29,27 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!-- 截屏用例要用 LockBits + 指针扫像素：一张 1080p 两百万个点，GetPixel 跑不动 -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      和 App.csproj 同样的理由：UseWindowsForms + ImplicitUsings 会把
+      System.Windows.Forms 和 System.Drawing 也做成全局 using，于是
+      Color、Size、Point、Rectangle 这些名字同时存在于 WPF 和 Forms 两边，
+      全都变成二义性错误。摘掉，需要的地方用 Forms./Drawing. 别名。
+    -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
+    <!-- 截屏用例在截不到图的 runner 上要能明确 Skip，而不是假装通过 -->
+    <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
 

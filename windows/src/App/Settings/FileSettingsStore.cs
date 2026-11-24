@@ -53,7 +53,20 @@ public sealed class FileSettingsStore : ISettingsStore, IDisposable
         }
     }
 
-    public string? GetString(string key) => _root[key]?.GetValue<string>();
+    // 读也要进锁。0.1.4 给这个类加了延迟落盘的 Timer，于是 _root 从此会被
+    // 线程池上的回调碰到（Flush → Save → ToJsonString）。JsonObject 不是
+    // 线程安全的，读的同时有人写就是真的数据竞争。
+    //
+    // 现在实际上撞不上：AppSettings 只在构造时读一次，那时还没有人 Set 过。
+    // 但这是「现在恰好安全」，不是「设计上安全」——加锁的代价是零，
+    // 而这个项目已经为「看起来没问题」付过足够多的学费了。
+    public string? GetString(string key)
+    {
+        lock (_gate)
+        {
+            return _root[key]?.GetValue<string>();
+        }
+    }
 
     public double? GetDouble(string key) => TryGet<double>(key);
 
@@ -63,21 +76,24 @@ public sealed class FileSettingsStore : ISettingsStore, IDisposable
 
     public IReadOnlyList<string>? GetStringList(string key)
     {
-        if (_root[key] is not JsonArray array)
+        lock (_gate)
         {
-            return null;
-        }
-
-        var list = new List<string>(array.Count);
-        foreach (JsonNode? item in array)
-        {
-            if (item is not null)
+            if (_root[key] is not JsonArray array)
             {
-                list.Add(item.GetValue<string>());
+                return null;
             }
-        }
 
-        return list;
+            var list = new List<string>(array.Count);
+            foreach (JsonNode? item in array)
+            {
+                if (item is not null)
+                {
+                    list.Add(item.GetValue<string>());
+                }
+            }
+
+            return list;
+        }
     }
 
     private T? TryGet<T>(string key)
@@ -85,7 +101,10 @@ public sealed class FileSettingsStore : ISettingsStore, IDisposable
     {
         try
         {
-            return _root[key] is { } node ? node.GetValue<T>() : null;
+            lock (_gate)
+            {
+                return _root[key] is { } node ? node.GetValue<T>() : null;
+            }
         }
         catch
         {

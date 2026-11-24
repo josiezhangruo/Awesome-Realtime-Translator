@@ -142,28 +142,37 @@
                                     -->
                                     <ContentControl Visibility="{Binding DataContext.TranslationVisibility,
                                                         RelativeSource={RelativeSource AncestorType=Window}}">
-                                        <TextBlock TextWrapping="Wrap"
+                                        <!--
+                                            0.2.1：译文也走 StreamingTextBlock。
+                                            在这之前它是个普通 TextBlock，直接 Text="{Binding Translation}"，
+                                            所以设置里那个「显现节奏」滑块对译文<b>物理上没有接线</b>——
+                                            用户反馈「调了没用」是对的，不是他没调对。
+                                            现在译文由解码器逐 token 喂进来，节奏器负责把它铺匀。
+                                        -->
+                                        <local:StreamingTextBlock TextWrapping="Wrap"
                                                    Margin="0,3,0,0"
                                                    FontWeight="Medium"
+                                                   Pace="{Binding DataContext.Settings.RevealPace,
+                                                       RelativeSource={RelativeSource AncestorType=Window}}"
                                                    FontSize="{Binding DataContext.TranslationFontSize,
                                                        RelativeSource={RelativeSource AncestorType=Window}}">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Text" Value="{Binding Translation}" />
+                                            <local:StreamingTextBlock.Style>
+                                                <Style TargetType="local:StreamingTextBlock">
+                                                    <Setter Property="FullText" Value="{Binding Translation}" />
                                                     <Setter Property="Foreground" Value="White" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsTranslating}" Value="True">
-                                                            <Setter Property="Text" Value="…" />
+                                                            <Setter Property="FullText" Value="…" />
                                                             <Setter Property="Foreground" Value="#59FFFFFF" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding TranslationFailed}" Value="True">
-                                                            <Setter Property="Text" Value="（本句翻译失败）" />
+                                                            <Setter Property="FullText" Value="（本句翻译失败）" />
                                                             <Setter Property="Foreground" Value="#CCFF9F43" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
+                                            </local:StreamingTextBlock.Style>
+                                        </local:StreamingTextBlock>
                                     </ContentControl>
                                 </StackPanel>
                             </DataTemplate>

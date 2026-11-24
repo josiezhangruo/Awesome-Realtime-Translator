@@ -144,6 +144,61 @@ public sealed class TermProtector
         return text;
     }
 
+    /// <summary>
+    /// 流式译文的中间前缀版 <see cref="Restore"/>。
+    ///
+    /// 中间前缀可能正好断在哨兵中间——<c>ZQX1</c> 才生成到 <c>ZQ</c>。直接还原的话，
+    /// 屏幕上会闪出一个 <c>ZQ</c>，下一帧才变成中文。所以先把结尾那截
+    /// <b>还没写完的哨兵</b>砍掉，再按正常规则还原。
+    ///
+    /// 砍掉的那几个字符下一次报告就会补齐，而贪心解码是 append-only 的，
+    /// 所以这不构成「改写」——只是晚一两帧出现。
+    /// </summary>
+    public static string RestorePartial(string translated, IReadOnlyDictionary<string, string> restore)
+    {
+        if (restore.Count == 0 || translated.Length == 0)
+        {
+            return Restore(translated, restore);
+        }
+
+        int cut = translated.Length;
+
+        // 结尾的数字可能是哨兵编号的一部分，连同 ZQX 一起往前看
+        int i = translated.Length;
+        while (i > 0 && char.IsAsciiDigit(translated[i - 1]))
+        {
+            i--;
+        }
+
+        int prefixStart = i - SentinelPrefix.Length;
+        if (prefixStart >= 0 &&
+            translated.AsSpan(prefixStart, SentinelPrefix.Length)
+                .Equals(SentinelPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            // 完整的哨兵（在 restore 表里）保留，残缺的砍掉
+            if (!restore.ContainsKey(translated[prefixStart..]))
+            {
+                cut = prefixStart;
+            }
+        }
+        else
+        {
+            // 连 ZQX 都没写全：ZQ / Z 这种结尾
+            for (int len = SentinelPrefix.Length - 1; len > 0; len--)
+            {
+                if (translated.Length >= len &&
+                    translated.AsSpan(translated.Length - len)
+                        .Equals(SentinelPrefix.AsSpan(0, len), StringComparison.OrdinalIgnoreCase))
+                {
+                    cut = translated.Length - len;
+                    break;
+                }
+            }
+        }
+
+        return Restore(translated[..cut], restore);
+    }
+
     /// <summary>按词边界找术语。避免 "on call" 命中 "falcon called"。</summary>
     private static bool ContainsWord(string haystack, string needle, out int index)
     {

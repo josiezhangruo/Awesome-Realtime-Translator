@@ -66,7 +66,30 @@ public interface ITranslator : IAsyncDisposable
 {
     Task PrepareAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default);
 
-    Task<string> TranslateAsync(string text, IReadOnlyList<string> context, CancellationToken cancellationToken = default);
+    /// <param name="partial">
+    /// 译文的<b>中间前缀</b>。支持流式的引擎边解码边往这里报，不支持的忽略即可。
+    ///
+    /// 这不违反「译文一旦出现就不再改写」：贪心解码是 append-only 的，
+    /// 后一次报出来的一定以前一次为前缀，token 不会被回收。真正会改写的是
+    /// 「拿未定稿原文反复重翻」，那个是另一回事，这里不做。
+    /// </param>
+    Task<string> TranslateAsync(
+        string text,
+        IReadOnlyList<string> context,
+        IProgress<string>? partial = null,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// 在调用方线程上<b>同步</b>回调的 <see cref="IProgress{T}"/>。
+///
+/// 不能用 <see cref="Progress{T}"/>：它通过 SynchronizationContext.Post 或线程池
+/// 异步派发，于是「译文的最后一个前缀」有可能排在「完整译文」后面才送达，
+/// 把已经写好的整句覆盖成半句。流式译文要求报告严格有序，这里就得同步。
+/// </summary>
+public sealed class SyncProgress<T>(Action<T> handler) : IProgress<T>
+{
+    public void Report(T value) => handler(value);
 }
 
 /// <summary>翻译引擎不可用时的降级实现：原样返回，等于「只显示原文」。</summary>
@@ -75,7 +98,11 @@ public sealed class PassthroughTranslator : ITranslator
     public Task PrepareAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 
-    public Task<string> TranslateAsync(string text, IReadOnlyList<string> context, CancellationToken cancellationToken = default) =>
+    public Task<string> TranslateAsync(
+        string text,
+        IReadOnlyList<string> context,
+        IProgress<string>? partial = null,
+        CancellationToken cancellationToken = default) =>
         Task.FromResult(string.Empty);
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

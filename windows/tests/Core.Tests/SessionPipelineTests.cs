@@ -113,7 +113,14 @@ public class SessionPipelineTests
         public Task PrepareAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default) =>
             PrepareError is not null ? Task.FromException(PrepareError) : Task.CompletedTask;
 
-        public async Task<string> TranslateAsync(string text, IReadOnlyList<string> context, CancellationToken cancellationToken = default)
+        /// <summary>流式报告出来的中间前缀，按顺序。</summary>
+        public List<string> Partials { get; } = [];
+
+        public async Task<string> TranslateAsync(
+            string text,
+            IReadOnlyList<string> context,
+            IProgress<string>? partial = null,
+            CancellationToken cancellationToken = default)
         {
             if (Interlocked.Increment(ref _concurrent) > 1)
             {
@@ -126,8 +133,21 @@ public class SessionPipelineTests
                 Seen.Add(text);
             }
 
+            // 模拟逐 token 吐前缀
+            string full = "【译】" + text;
+            for (int i = 1; i < full.Length; i += 3)
+            {
+                string prefix = full[..i];
+                lock (Partials)
+                {
+                    Partials.Add(prefix);
+                }
+
+                partial?.Report(prefix);
+            }
+
             Interlocked.Decrement(ref _concurrent);
-            return "【译】" + text;
+            return full;
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -198,7 +218,12 @@ public class SessionPipelineTests
         transcriber.Emit(TranscriptEvent.Finalized("Tell me about yourself."));
 
         await WaitUntilAsync(() => store.Lines.Count == 1, "句子应该进入 store");
-        await WaitUntilAsync(() => store.Lines[0].Translation is not null, "译文应该回填");
+
+        // 等<b>完整</b>译文，不能等「非 null」：流式翻译会先填若干个前缀进去，
+        // 等非 null 的话会在半句上就往下断言。
+        await WaitUntilAsync(
+            () => store.Lines[0].Translation == "【译】Tell me about yourself.",
+            "译文应该回填");
 
         Assert.Equal("Tell me about yourself.", store.Lines[0].Source);
         Assert.Equal("【译】Tell me about yourself.", store.Lines[0].Translation);

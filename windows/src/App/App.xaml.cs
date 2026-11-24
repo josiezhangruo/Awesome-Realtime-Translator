@@ -24,6 +24,7 @@ public partial class App : System.Windows.Application
     private const int HotKeyToggle = 1;
     private const int HotKeyVisibility = 2;
 
+    private FileSettingsStore _settingsStore = null!;
     private AppSettings _settings = null!;
     private CaptionStore _store = null!;
     private SessionPipeline _pipeline = null!;
@@ -35,7 +36,8 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
-        _settings = new AppSettings(new FileSettingsStore());
+        _settingsStore = new FileSettingsStore();
+        _settings = new AppSettings(_settingsStore);
         _store = new CaptionStore();
 
         string? whisperModel = ModelPaths.FindWhisperModel();
@@ -51,6 +53,24 @@ public partial class App : System.Windows.Application
         {
             Diagnostics.Log.Error("未观察的任务异常", e.Exception);
             e.SetObserved();
+        };
+
+        // UI 线程的异常走的是 Dispatcher，上面那两个都接不到它。
+        // 原来没挂这个钩子，于是任何一个界面上的异常都会直接把进程带走——
+        // 用户看到的是「点一下就闪退」，而且连个说法都没有。
+        //
+        // 这里标成已处理：一个设置窗画不出来不该让整个应用消失，
+        // 字幕本身还在工作。错误照样写进日志，也当面告诉用户。
+        DispatcherUnhandledException += (_, e) =>
+        {
+            Diagnostics.Log.Error("界面线程异常", e.Exception);
+            e.Handled = true;
+            MessageBox.Show(
+                $"出错了，但程序还在运行，字幕不受影响。\n\n{e.Exception.Message}\n\n" +
+                $"详细信息已写入日志：\n{Diagnostics.Log.FilePath}",
+                "面试字幕",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         };
 
         _pipeline = new SessionPipeline(
@@ -195,7 +215,25 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private void OpenSettings() => SettingsWindow.Show(_settings, ModelPaths.DescribeLocation());
+    private void OpenSettings()
+    {
+        // 托盘菜单的点击回调跑在 WinForms 的嵌套消息循环里，那里抛出去的异常
+        // 不一定经过 DispatcherUnhandledException，所以这条路径自己兜一层。
+        try
+        {
+            SettingsWindow.Show(_settings, ModelPaths.DescribeLocation());
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error("打开设置窗失败", ex);
+            MessageBox.Show(
+                $"设置窗打不开，但字幕不受影响。\n\n{ex.Message}\n\n" +
+                $"详细信息已写入日志：\n{Diagnostics.Log.FilePath}",
+                "面试字幕",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
 
     private void OpenLogFolder()
     {
@@ -274,6 +312,8 @@ public partial class App : System.Windows.Application
         }
         finally
         {
+            // 设置是延迟落盘的，这里必须冲一次，否则关窗前最后改的那下会丢。
+            _settingsStore.Dispose();
             Shutdown();
         }
     }

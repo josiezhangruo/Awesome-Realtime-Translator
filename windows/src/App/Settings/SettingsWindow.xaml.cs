@@ -49,8 +49,27 @@ public partial class SettingsWindow : Window
 
         UpdateLabels();
         _loading = false;
+
+        // 真的拿到焦点之后就撤掉 Topmost。它只是用来保证窗口能被看见，
+        // 不是要一直压在别人头上。见 Show() 里的解释。
+        Activated += (_, _) => Topmost = false;
     }
 
+    /// <summary>
+    /// 打开设置窗。
+    ///
+    /// <b>为什么要折腾 Topmost。</b>字幕窗带 WS_EX_NOACTIVATE——点它不会让本进程
+    /// 变成前台进程，这是故意的（面试时打字不能被打断）。但副作用是：用户点 ⚙ 的
+    /// 那一刻，前台进程仍然是浏览器或会议软件，于是这里的 Activate() 会被 Windows
+    /// 的前台切换限制直接拒绝，设置窗<b>开在了前台窗口的后面</b>。
+    ///
+    /// 用户看到的就是「点设置没反应」。再点一次还是没反应，因为单例已经建好了，
+    /// Show() 变成空操作，Activate() 继续被拒。线上反馈的「点设置就卡死」就是这个。
+    ///
+    /// Topmost 不受前台切换限制，窗口能浮上来；用户点一下它就正常拿到焦点，
+    /// 然后 Activated 把 Topmost 撤掉。如果始终没拿到焦点，它就一直浮着——
+    /// 对这个场景这正是想要的兜底。
+    /// </summary>
     public static void Show(AppSettings settings, string modelDirectory)
     {
         if (_instance is null)
@@ -59,6 +78,12 @@ public partial class SettingsWindow : Window
             _instance.Closed += (_, _) => _instance = null;
         }
 
+        if (_instance.WindowState == WindowState.Minimized)
+        {
+            _instance.WindowState = WindowState.Normal;
+        }
+
+        _instance.Topmost = true;
         _instance.Show();
         _instance.Activate();
     }

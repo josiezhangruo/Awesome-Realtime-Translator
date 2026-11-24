@@ -136,15 +136,18 @@ Sources/AwesomeRealtimeTranslator/
 
 已经写完，功能和 macOS 版对齐，代码在 [`windows/`](windows/README.md)。
 
-**[下载 Beta（389 MB）](https://github.com/yangli-0409/Awesome-Realtime-Translator/releases/tag/v0.1.3-windows-beta)** · 需要 Windows 10 2004 及以上
+**[下载 Beta（389 MB）](https://github.com/yangli-0409/Awesome-Realtime-Translator/releases/tag/v0.1.4-windows-beta)** · 需要 Windows 10 2004 及以上
 
 解压后整个文件夹别拆开，模型和组件都得和主程序在一起。没有代码签名证书，
 Windows 会提示「未知发布者」，点「更多信息」→「仍要运行」。
 
-标 Beta 是因为**这个版本从来没有在 Windows 上运行过**。移植是在一台 Mac 上完成的：
-代码能编译成真正的 Windows 可执行文件（x64 和 arm64 都验证过），87 个单测全过，
-翻译也在开发机上用真实模型实测过。缺的是最关键的两件事——
-能不能抓到系统声音、字幕窗是不是真的从屏幕共享里消失。
+移植是在一台 Mac 上完成的：代码能编译成真正的 Windows 可执行文件（x64 和 arm64
+都验证过），87 个单测全过，翻译也在开发机上用真实模型实测过。
+
+**2026-11-24：已经有用户在真 Windows 上跑起来了**——抓得到系统声音，出得了字幕
+和译文。原先最大的两个未知项，过了一个。
+
+仍然标 Beta，因为另一个还在：**字幕窗是不是真的从屏幕共享里消失，还没有人实测过。**
 
 **共享屏幕前请自己用会议软件的共享预览确认一次。**
 

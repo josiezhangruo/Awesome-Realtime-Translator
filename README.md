@@ -159,17 +159,21 @@ An honest dividing line. Do not read the two lists as one.
 Written and feature-matched to the macOS version; the code lives in
 [`windows/`](windows/README.md).
 
-**[Download the beta (389 MB)](https://github.com/yangli-0409/Awesome-Realtime-Translator/releases/tag/v0.1.3-windows-beta)** · needs Windows 10 2004 or newer
+**[Download the beta (389 MB)](https://github.com/yangli-0409/Awesome-Realtime-Translator/releases/tag/v0.1.4-windows-beta)** · needs Windows 10 2004 or newer
 
 Keep the extracted folder intact — the models and native components have to sit next to the
 executable. There is no code-signing certificate, so Windows will warn about an unknown
 publisher; choose **More info → Run anyway**.
 
-It is labelled beta because **nobody has actually run it on Windows yet**. The port was
-written on a Mac: it compiles to real Windows executables (verified for both x64 and arm64),
-all 87 unit tests pass, and translation was measured end to end on the dev machine with the
-real model. What is missing is the part that matters most — whether it captures system audio,
-and whether the caption window really disappears from screen sharing.
+The port was written on a Mac: it compiles to real Windows executables (verified for both
+x64 and arm64), all 87 unit tests pass, and translation was measured end to end on the dev
+machine with the real model.
+
+**2026-11-24: a user has now run it on real Windows** — system audio capture works, captions
+and translations come through. That was one of the two biggest unknowns, and it has passed.
+
+It is still labelled beta because of the other one: **nobody has verified that the caption
+window actually disappears from screen sharing.**
 
 **Check it yourself with your meeting app's share preview before you share a screen.**
 

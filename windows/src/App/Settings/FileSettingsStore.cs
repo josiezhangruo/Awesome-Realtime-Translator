@@ -11,16 +11,22 @@ namespace AwesomeRealtimeTranslator.Settings;
 ///
 /// 用 JSON 而不是注册表：用户能自己看、自己改、自己删，卸载时删一个目录就干净了。
 /// </summary>
-public sealed class FileSettingsStore : ISettingsStore
+public sealed class FileSettingsStore : ISettingsStore, IDisposable
 {
+    /// <summary>停手多久之后才真的落盘。见 <see cref="Set"/> 里的解释。</summary>
+    private const int SaveDelayMs = 300;
+
     private readonly string _path;
     private readonly JsonObject _root;
     private readonly object _gate = new();
+    private readonly Timer _saveTimer;
+    private bool _dirty;
 
     public FileSettingsStore(string? path = null)
     {
         _path = path ?? DefaultPath;
         _root = Load(_path);
+        _saveTimer = new Timer(_ => Flush(), null, Timeout.Infinite, Timeout.Infinite);
     }
 
     public static string DefaultDirectory => Path.Combine(
@@ -102,8 +108,40 @@ public sealed class FileSettingsStore : ISettingsStore
                 _ => JsonValue.Create(value.ToString()),
             };
 
+            // 以前这里是直接 Save()，一次改动一次落盘。问题出在设置窗的滑块上：
+            // 它们是 IsSnapToTickEnabled 的，拖一次会每跨一个刻度就触发一次
+            // ValueChanged——不透明度那条从 0.3 拖到 1.0 就是 35 次。
+            // 每次都是「写临时文件 + File.Move 替换」，而 %APPDATA% 底下的写入
+            // 要过一遍实时杀毒扫描，几十毫秒起步。叠起来就是界面肉眼可见的卡顿，
+            // 而且这一切都发生在 UI 线程上。
+            //
+            // 改成合并：内存里立刻生效，停手 300ms 之后才写一次盘。
+            _dirty = true;
+            _saveTimer.Change(SaveDelayMs, Timeout.Infinite);
+        }
+    }
+
+    /// <summary>
+    /// 立刻把挂起的改动写下去。退出前必须调用，否则最后 300ms 内改的设置会丢。
+    /// </summary>
+    public void Flush()
+    {
+        lock (_gate)
+        {
+            if (!_dirty)
+            {
+                return;
+            }
+
+            _dirty = false;
             Save();
         }
+    }
+
+    public void Dispose()
+    {
+        _saveTimer.Dispose();
+        Flush();
     }
 
     private void Save()

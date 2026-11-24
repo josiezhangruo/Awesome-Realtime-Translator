@@ -50,7 +50,7 @@
 
 需要 **macOS 26 及以上**。通用二进制（Apple 芯片 / Intel），0.8 MB。
 
-1. [下载](https://yangli-0409.github.io/Awesome-Realtime-Translator/AwesomeRealtimeTranslator-0.1.0.zip)、
+1. [下载](https://yangli-0409.github.io/Awesome-Realtime-Translator/AwesomeRealtimeTranslator-0.2.0.zip)、
    解压，拖进「应用程序」。
 2. **第一次打开用右键。** 系统会说「无法验证开发者」，因为这个版本背后没有苹果开发者证书。
    右键点它 → 选「打开」→ 再确认一次。只需要做一次。

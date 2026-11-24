@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>面试字幕 · 共享自测页</title>
+<meta name="description" content="开会前自己确认一次：共享屏幕时，字幕窗是不是真的不会出现在对方的画面里。">
+<meta name="robots" content="noindex">
+<style>
+:root{
+  --bg:#0b0f14; --surface:#131a22; --surface-2:#1a232d;
+  --line:rgba(255,255,255,.09); --text:#e8eef5; --muted:#93a3b4;
+  --accent:#3ddc97; --bad:#ff6b6b; --warn:#f0c15c; --radius:14px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--text);padding:48px 0 80px;
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:860px;margin:0 auto;padding:0 24px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+h1{font-size:30px;letter-spacing:-.4px;margin:0 0 10px}
+h2{font-size:18px;margin:44px 0 10px}
+p{margin:0 0 14px}
+.sub{color:var(--muted);margin:0 0 28px}
+kbd{
+  background:var(--surface-2);border:1px solid var(--line);border-bottom-width:2px;
+  border-radius:5px;padding:1px 6px;font-size:13px;font-family:inherit;
+}
+ol{padding-left:22px;margin:0 0 22px}
+ol li{margin:9px 0}
+.btn{
+  display:inline-block;padding:12px 24px;border-radius:11px;font-size:16px;font-weight:600;
+  background:var(--accent);color:#06281b;border:1px solid transparent;cursor:pointer;
+  font-family:inherit;
+}
+.btn.ghost{background:transparent;color:var(--text);border-color:var(--line)}
+.btn:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px}
+
+/* 自检用的标记带。共享画面里认不出它，就说明这次检测不作数。
+   必须 sticky：用户按页面说的往下滚去看预览时，它要是跟着滚出屏幕，
+   检测就会在用户正确操作的时候报「不作数」——那比没有这个检测还糟。 */
+#marker{
+  position:sticky;top:0;z-index:5;
+  min-height:74px;padding:10px 16px;text-align:center;
+  border-radius:0 0 12px 12px;margin:0 0 24px;
+  background:repeating-linear-gradient(135deg,#ff00aa 0 28px,#d9008f 28px 56px);
+  display:grid;place-items:center;color:#fff;font-weight:700;letter-spacing:.5px;
+  text-shadow:0 1px 3px rgba(0,0,0,.45);
+  box-shadow:0 6px 18px rgba(0,0,0,.45);
+}
+
+#verdict{
+  border-radius:var(--radius);padding:18px 20px;margin:0 0 10px;
+  border:1px solid var(--line);background:var(--surface);
+  font-size:18px;font-weight:600;
+}
+#verdict.ok{border-color:rgba(61,220,151,.45);background:rgba(61,220,151,.10);color:var(--accent)}
+#verdict.bad{border-color:rgba(255,107,107,.45);background:rgba(255,107,107,.10);color:var(--bad)}
+#verdict.warn{border-color:rgba(240,193,92,.45);background:rgba(240,193,92,.10);color:var(--warn)}
+#detail{color:var(--muted);font-size:14px;margin:0 0 26px;min-height:1.75em}
+
+.panes{display:grid;gap:18px;grid-template-columns:1fr;margin:0 0 10px}
+.pane{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+.pane h3{margin:0 0 4px;font-size:14px}
+.pane p{margin:0 0 10px;font-size:13px;color:var(--muted)}
+video,canvas.out{
+  width:100%;display:block;border-radius:9px;background:#000;
+  border:1px solid var(--line);
+}
+video{max-height:380px;object-fit:contain}
+.hintbox{
+  background:var(--surface);border-left:3px solid var(--warn);
+  border-radius:0 10px 10px 0;padding:14px 18px;margin:0 0 22px;font-size:14.5px;
+}
+.hintbox b{color:var(--warn)}
+table{border-collapse:collapse;width:100%;font-size:15px;margin:0 0 22px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-size:13px;font-weight:600}
+.foot{margin-top:44px;padding-top:22px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+@media (max-width:560px){
+  #marker{font-size:13.5px;line-height:1.5}
+  h1{font-size:25px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>共享自测页</h1>
+<p class="sub">
+  开会前花一分钟,自己看一眼:共享屏幕的时候,字幕窗是不是真的不在对方的画面里。<br>
+  全程只在你的浏览器里运行,画面不会上传到任何地方。<br>
+  <b>在你跑面试字幕的那台电脑上打开这个页面</b>,用 Chrome 或 Edge。手机上测不了。
+</p>
+
+<div id="marker">↑ 这条粉色带子是检测用的参照物,别遮住它 ↑</div>
+
+<h2>怎么测</h2>
+<ol>
+  <li>先把<b>面试字幕</b>打开,让字幕窗出现在屏幕顶部正中。不用点开始,出现就行。</li>
+  <li id="step2">在字幕窗的设置里确认<b>「屏幕共享时隐藏字幕窗」</b>是打开的(默认就是开的)。</li>
+  <li>回到这个页面,点「开始检测」,在弹出的选择器里选<b>「整个屏幕」</b>。</li>
+  <li>看下面的结果和预览。预览里是什么,对方就看到什么。</li>
+</ol>
+
+<div class="row">
+  <button class="btn" id="start">开始检测</button>
+  <button class="btn ghost" id="stop" disabled>停止</button>
+</div>
+
+<div id="verdict">未开始</div>
+<p id="detail"></p>
+
+<div class="panes">
+  <div class="pane">
+    <h3>屏幕顶部放大</h3>
+    <p>字幕窗固定在屏幕顶部正中。这里把那一块放大了,方便你看清它在不在。</p>
+    <canvas class="out" id="crop"></canvas>
+  </div>
+  <div class="pane">
+    <h3>对方收到的完整画面</h3>
+    <p>这就是共享出去的原始画面。</p>
+    <video id="v" autoplay muted playsinline></video>
+  </div>
+</div>
+
+<h2>怎么判断</h2>
+<table>
+  <tr><th style="width:34%">你看到的</th><th>意思</th></tr>
+  <tr>
+    <td style="color:var(--accent)">粉色带子在,字幕窗不在</td>
+    <td><b>通过。</b>画面确实抓到了你的屏幕,而字幕窗没被抓进去——这正是想要的结果。</td>
+  </tr>
+  <tr>
+    <td style="color:var(--bad)">粉色带子在,字幕窗也在</td>
+    <td><b>不要用。</b>隐藏没生效,对方会看到你的字幕。先去设置里确认开关是开的;还是不行就别在共享时用它。</td>
+  </tr>
+  <tr>
+    <td style="color:var(--warn)">粉色带子不在</td>
+    <td><b>这次不作数。</b>说明画面里根本没有这个页面——可能你选的不是「整个屏幕」,或者浏览器窗口被挡住/最小化了。重测一次。</td>
+  </tr>
+</table>
+
+<div class="hintbox">
+  <b>为什么要盯着那条粉色带子。</b>
+  如果共享根本没抓到你的屏幕(选错了共享对象、画面是黑的),预览里同样看不到字幕窗——
+  但那不是「隐藏成功」,是「什么都没测」。这两种情况长得一模一样,而误判的代价是
+  你带着一个对方看得见的字幕窗去面试。所以先确认参照物在,结论才成立。
+</div>
+
+<h2>这个测试测不到什么</h2>
+<p>
+  这个页面用的是<b>网页版会议</b>用的那套屏幕共享接口。结论对 Chrome / Edge 里的
+  Google Meet、Zoom 网页版、飞书网页版、腾讯会议网页版都成立。
+</p>
+<p>
+  <b>桌面客户端是另一回事。</b>Zoom、Teams、飞书的桌面版有自己的抓屏方式,
+  有的会绕过系统的「不要截取此窗口」标记。要用桌面客户端的话,请用它自带的共享预览
+  再确认一次,或者拿另一台设备入会看一眼。
+</p>
+<p>
+  录屏软件、截图工具同理:换一个工具就该重测一次。
+</p>
+
+<p class="foot">
+  <a href="../">← 回下载页</a> ·
+  <a href="https://github.com/yangli-0409/Awesome-Realtime-Translator">GitHub</a> ·
+  测不过欢迎<a href="https://github.com/yangli-0409/Awesome-Realtime-Translator/issues">开 issue</a>,
+  请附上你的系统版本和会议软件
+</p>
+
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const video = $('v');
+const crop = $('crop');
+const cropCtx = crop.getContext('2d');
+
+// 取样画布。缩小到 1/4 再数像素，够用而且快得多。
+const probe = document.createElement('canvas');
+const probeCtx = probe.getContext('2d', { willReadFrequently: true });
+
+let stream = null, timer = null, frames = 0, markerFrames = 0, surfaceWarning = '';
+
+if (/Windows/.test(navigator.userAgent)) {
+  $('step2').innerHTML =
+    '在字幕窗右上角 ⚙ 里确认<b>「屏幕共享时隐藏字幕窗」</b>是打开的（默认就是开的）。' +
+    '如果设置窗打不开，请先升级到 0.1.4 以上。';
+}
+
+$('start').onclick = async () => {
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    setVerdict('warn', '这个浏览器不支持网页屏幕共享');
+    $('detail').textContent = '请换 Chrome 或 Edge 再试。';
+    return;
+  }
+
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 10, displaySurface: 'monitor' },
+      audio: false,
+      monitorTypeSurfaces: 'include',
+    });
+  } catch (e) {
+    setVerdict('warn', '没有开始共享');
+    $('detail').textContent = e.message;
+    return;
+  }
+
+  const track = stream.getVideoTracks()[0];
+  const surface = track.getSettings().displaySurface;
+  // 只共享了一个标签页或一个窗口的话，字幕窗本来就不会出现，测了等于没测。
+  surfaceWarning = (surface && surface !== 'monitor')
+    ? '你共享的不是整个屏幕，这次结果不作数。停止后重选「整个屏幕」。'
+    : '';
+
+  video.srcObject = stream;
+  track.onended = stop;
+
+  $('start').disabled = true;
+  $('stop').disabled = false;
+  frames = markerFrames = 0;
+  timer = setInterval(tick, 300);
+};
+
+$('stop').onclick = stop;
+
+function stop() {
+  clearInterval(timer);
+  timer = null;
+  stream?.getTracks().forEach(t => t.stop());
+  stream = null;
+  video.srcObject = null;
+  cropCtx.clearRect(0, 0, crop.width, crop.height);
+  $('start').disabled = false;
+  $('stop').disabled = true;
+  setVerdict('', '已停止');
+  $('detail').textContent = frames
+    ? `这一轮检查了 ${frames} 帧，其中 ${markerFrames} 帧认出了粉色参照物。`
+    : '';
+}
+
+function setVerdict(cls, text) {
+  $('verdict').className = cls;
+  $('verdict').textContent = text;
+}
+
+function tick() {
+  if (!video.videoWidth) return;
+
+  // 1) 缩小取样，数粉色像素，确认这一帧里真的有本页面。
+  const w = probe.width = Math.max(1, Math.round(video.videoWidth / 4));
+  const h = probe.height = Math.max(1, Math.round(video.videoHeight / 4));
+  probeCtx.drawImage(video, 0, 0, w, h);
+  const data = probeCtx.getImageData(0, 0, w, h).data;
+
+  let pink = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    // 品红：红和蓝都明显高于绿。半透明叠加后依然成立。
+    if (r - g > 45 && b - g > 35 && r > 110) pink++;
+  }
+  // 那条带子铺满整行，占比远高于零星的粉色图标。
+  const markerSeen = pink > w * h * 0.0015;
+
+  frames++;
+  if (markerSeen) markerFrames++;
+
+  // 2) 把屏幕顶部那一条放大画出来——字幕窗固定在 Top=60、水平居中。
+  const cw = crop.width = video.videoWidth;
+  const ch = crop.height = Math.round(video.videoHeight * 0.3);
+  cropCtx.drawImage(video, 0, 0, cw, ch, 0, 0, cw, ch);
+
+  if (surfaceWarning) {
+    setVerdict('warn', '⚠️ 这次不作数');
+    $('detail').textContent = surfaceWarning;
+  } else if (!markerSeen) {
+    setVerdict('warn', '⚠️ 这次不作数：画面里找不到粉色参照物');
+    $('detail').textContent =
+      '说明共享画面里没有这个页面。可能选的不是「整个屏幕」，' +
+      '或者浏览器被挡住、最小化了。把这个页面露出来再看。' +
+      `（已检查 ${frames} 帧）`;
+  } else {
+    setVerdict('ok', '✅ 画面有效，现在看上面的放大图');
+    $('detail').textContent =
+      '参照物认出来了，说明确实抓到了你的屏幕。' +
+      '现在看「屏幕顶部放大」那张图里有没有字幕窗：没有就是通过，有就别在共享时用它。' +
+      `（已检查 ${frames} 帧，认出 ${markerFrames} 帧）`;
+  }
+}
+</script>
+</body>
+</html>

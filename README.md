@@ -169,6 +169,12 @@ The port was written on a Mac: it compiles to real Windows executables (verified
 x64 and arm64), all 87 unit tests pass, and translation was measured end to end on the dev
 machine with the real model.
 
+Since 0.1.5, [CI on `windows-latest`](.github/workflows/windows.yml) builds both
+architectures and **constructs every WPF window on real Windows** on each push. That check
+exists because of a specific bug: from 0.1.0 through 0.1.4 the settings window threw during
+XAML parsing on *every* Windows machine, and "it compiles" had been standing in for "it
+runs". Reverting the fix on a scratch branch turns the CI red in about three seconds.
+
 **2026-11-24: a user has now run it on real Windows** — system audio capture works, captions
 and translations come through. That was one of the two biggest unknowns, and it has passed.
 

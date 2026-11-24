@@ -1,5 +1,7 @@
 # 面试字幕 · Windows 版
 
+[![Windows](https://github.com/yangli-0409/Awesome-Realtime-Translator/actions/workflows/windows.yml/badge.svg)](https://github.com/yangli-0409/Awesome-Realtime-Translator/actions/workflows/windows.yml)
+
 macOS 版的 Windows 移植。同一个产品，同一条边界：**只帮你听懂，不替你回答。**
 
 - 上级目录：[项目主 README](../README.zh-CN.md)
@@ -61,7 +63,7 @@ dotnet tool  # 需要 .NET 10 SDK
 ```
 
 ```bash
-cd windows && ./tools/fetch-models.sh && dotnet test
+cd windows && ./tools/fetch-models.sh && dotnet test tests/Core.Tests/Core.Tests.csproj
 ```
 
 ```bash
@@ -69,18 +71,46 @@ pwsh tools/package.ps1
 ```
 
 **整个解决方案在 macOS 和 Linux 上也能构建**（`EnableWindowsTargeting`），
-这个移植就是在一台 Mac 上写完的。`dotnet test` 在任何平台上都能跑。
+这个移植就是在一台 Mac 上写完的。但**测试分两半**，别在非 Windows 上
+直接跑 `dotnet test`（那会连 `App.Tests` 一起拉进来，必然失败）：
 
 ```
 windows/
-├── src/Core/      平台无关：断句、显现节奏、管道装配、翻译
-├── src/App/       Windows 专有：WASAPI、Whisper、WPF 界面、Win32 互操作
-├── tests/         87 个单测，任何平台都能跑
-└── tools/         取模型、画图标、打包
+├── src/Core/          平台无关：断句、显现节奏、管道装配、翻译
+├── src/App/           Windows 专有：WASAPI、Whisper、WPF 界面、Win32 互操作
+├── tests/Core.Tests/  87 个单测，任何平台都能跑
+├── tests/App.Tests/   窗口构造测试，只有真 Windows 能跑（CI 上跑）
+└── tools/             取模型、画图标、打包
 ```
 
 分层的理由是**可验证性**：凡是能放进 Core 的逻辑都放了进去，于是它们在开发机上
 就能真跑测试。留在 App 里的只有非 Windows 不可的部分。
+
+### CI 替开发机跑 Windows
+
+[`.github/workflows/windows.yml`](../.github/workflows/windows.yml) 在
+`windows-latest` 上还原、构建、跑两个测试工程，另一个 job 构建 `win-arm64`。
+
+**这是 0.1.5 之后才有的，而它存在的理由就是上面那个 bug。**
+「能编译」被当成「能跑」整整四个版本，代价是一个真实用户在面试前踩雷。
+`App.Tests` 做的事少到有点可笑——把每个 XAML 窗口 `new` 一次，断言标签和
+滑块真的被填上了。不显示、不点击、不截图。但那个 bug 就在构造函数里，
+所以这一下就够了（构造窗口不创建 HWND，CI runner 上照样跑）。
+
+守的那条线是：**每个 XAML 窗口都必须能被 new 出来。**新加窗口就往
+`WindowConstructionTests` 里加一个用例。
+
+**这个测试被验证过是真的有牙**，不是写上去好看的。做法是把 0.1.5 的修复
+回退到一个临时分支上、`workflow_dispatch` 跑一次：
+
+| | 结果 |
+|---|---|
+| 四个 `SettingsWindow` 用例 | **全红**，堆栈就是线上那条：`NullReferenceException → UpdateLabels → OnFontSizeChanged → InitializeComponent` |
+| `CaptionWindow` 用例 | 照常通过 —— 说明它不是无差别地红 |
+| 耗时 | 约 3 秒 |
+
+一个花了四个版本、一个真实用户、两轮错误诊断才抓到的 bug，在 CI 上三秒复现。
+一个测试值不值，看的就是这个。
 
 ## 四件和 Mac 版实现思路不同的事
 
@@ -169,11 +199,19 @@ Mac 版是一个 `.app` 包，看起来是一个图标，其实是目录。Windo
 
 **2026-11-24 更新：有用户在真 Windows 上跑起来了。** 下面的分界线按这次反馈重画过。
 
+**已验证（CI，windows-latest，0.1.5 起）**
+
+- **两个 XAML 窗口都能在真 Windows 上构造出来**，而且标签和滑块真的被填上了。
+  就是这一条在 0.1.0–0.1.4 之间漏掉了（见下）。
+- `win-x64` 和 `win-arm64` 都零警告构建通过。
+- Core.Tests 在 CI 上是 82 过 + **5 跳过**：那 5 个是翻译测试，需要真实的
+  OPUS-MT 模型，CI 没取模型（389MB）所以自动跳过。它们在开发机上是真跑过的。
+
 **已验证（开发机上）**
 
 - 整个解决方案零警告编译，产物是真正的 Windows PE32+ 可执行文件。
-- 87 个单元测试全过，覆盖断句（27 条从 Swift 逐条移植，行为完全一致）、
-  显现节奏、整条管道的装配与降级路径、术语保护。
+- 87 个单元测试全过（含上面在 CI 上被跳过的那 5 个），覆盖断句（27 条从 Swift
+  逐条移植，行为完全一致）、显现节奏、整条管道的装配与降级路径、术语保护。
 - **翻译是真跑过的**，不是只编译通过：ONNX Runtime 跨平台，所以用真实模型在
   开发机上完成了端到端翻译，上面那些译文就是实际输出。单句 36~128ms。
 - 管道的全部错误路径：识别器加载失败、翻译器降级、音频中断、停机冲刷。
@@ -196,8 +234,9 @@ Mac 版是一个 `.app` 包，看起来是一个图标，其实是目录。Windo
 3. 全局快捷键是否被别的程序占用。
 4. 长会话的稳定性、内存和 CPU 占用。
 5. 在装了第三方杀毒软件的机器上会不会被误报拦截。
-6. 0.1.5 对设置窗的修复本身。病因是从一条真实堆栈定位的（见下），
-   证据比 0.1.4 那两个猜测强得多，但**我仍然没有在 Windows 上点开过这个窗口**。
+6. 设置窗的**交互**。构造已经由 CI 在真 Windows 上验证了（0.1.5 起），
+   但「点 ⚙ 之后它是不是真的出现在你眼前」还没有：那取决于 `Topmost`
+   和前台切换限制那段推理，而**那段推理从来没被实测验证过**。
 7. 放在非系统盘上模型加载崩掉那件事，病因还没查清（见下）。
 
 把第 1 条跑通，这个版本才算真的能用。其余都是调参。

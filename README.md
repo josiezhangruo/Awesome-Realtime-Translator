@@ -165,23 +165,30 @@ Keep the extracted folder intact — the models and native components have to si
 executable. There is no code-signing certificate, so Windows will warn about an unknown
 publisher; choose **More info → Run anyway**.
 
-The port was written on a Mac: it compiles to real Windows executables (verified for both
-x64 and arm64), all 87 unit tests pass, and translation was measured end to end on the dev
-machine with the real model.
+The port was written on a Mac, with no Windows machine. Verification is therefore delegated
+to [CI on `windows-latest`](.github/workflows/windows.yml): every push runs **110 tests on a
+real Windows box** and builds both architectures.
 
-Since 0.1.5, [CI on `windows-latest`](.github/workflows/windows.yml) builds both
-architectures and **constructs every WPF window on real Windows** on each push. That check
-exists because of a specific bug: from 0.1.0 through 0.1.4 the settings window threw during
-XAML parsing on *every* Windows machine, and "it compiles" had been standing in for "it
-runs". Reverting the fix on a scratch branch turns the CI red in about three seconds.
+That check was added in 0.1.5 because of a specific bug: from 0.1.0 through 0.1.4 the
+settings window threw during XAML parsing on *every* Windows machine, and "it compiles" had
+been standing in for "it runs". Reverting the fix on a scratch branch turns the CI red in
+about three seconds.
+
+**Since 0.2.0 the product's central promise is machine-checked too.** CI shows the window,
+**takes an actual screenshot**, and asserts the window is not in it — alongside a control
+case that captures the window *without* the exclusion and requires it to be found, so a
+runner that cannot capture the screen reports "inconclusive" instead of a false pass.
+Before 0.2.0 nobody and nothing had ever verified this.
 
 **2026-11-24: a user has now run it on real Windows** — system audio capture works, captions
-and translations come through. That was one of the two biggest unknowns, and it has passed.
+and translations come through. Both of the two biggest unknowns have now passed.
 
-It is still labelled beta because of the other one: **nobody has verified that the caption
-window actually disappears from screen sharing.**
+It is still labelled beta, but for a smaller reason: CI verifies the capture path Windows
+itself provides, and **nobody has tested it inside an actual meeting client** — Zoom, Teams
+and others grab the screen in more than one way.
 
-**Check it yourself with your meeting app's share preview before you share a screen.**
+**So check it yourself with your meeting app's share preview before you share a screen**, or
+run the [self-test page](https://yangli-0409.github.io/Awesome-Realtime-Translator/test/).
 
 | | macOS | Windows |
 |---|---|---|

@@ -69,4 +69,14 @@
     <ProjectReference Include="../Core/Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      开给窗口构造测试。要的就是两样东西：SettingsWindow 的构造函数
+      （它是私有单例，外面只有 Show()），以及 WPF 为 x:Name 生成的字段
+      ——那些字段默认就是 internal，所以断言「标签真的填上了」必须走这条路。
+      测试工程的 AssemblyName 必须正好是 App.Tests。
+    -->
+    <InternalsVisibleTo Include="App.Tests" />
+  </ItemGroup>
+
 </Project>

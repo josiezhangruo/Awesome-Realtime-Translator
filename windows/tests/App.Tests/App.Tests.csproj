@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    唯一能验证 WPF 那一半的测试工程。
+
+    为什么单独开一个：Core.Tests 是平台无关的（net10.0），跑不了窗口。
+    而这个项目踩过最贵的一个坑恰好就在窗口构造期——见 windows/README.md
+    里「设置窗从来没有打开过」：一个 XAML 解析期的 NullReferenceException，
+    在每一台 Windows 机器上必崩，却在 Mac 开发机上连触发的机会都没有，
+    因为 WPF 在 macOS 上根本跑不起来。从 0.1.0 一直带到 0.1.4 才被用户的
+    日志抓住。
+
+    所以这个工程只在 CI 的 windows-latest 上执行（.github/workflows/windows.yml）。
+    在 Mac 上它能编译但不能运行，本地开发照旧只跑 Core.Tests。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AwesomeRealtimeTranslator.Ui.Tests</RootNamespace>
+
+    <!-- 必须正好叫这个：App.csproj 里的 InternalsVisibleTo 指的就是它。 -->
+    <AssemblyName>App.Tests</AssemblyName>
+
+    <!-- 跟 App.csproj 对齐，不然引用一个钉死 RID 的工程会报 NETSDK1047。 -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/App/App.csproj" />
+  </ItemGroup>
+
+</Project>

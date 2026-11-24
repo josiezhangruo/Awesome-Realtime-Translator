@@ -19,7 +19,9 @@ public partial class SettingsWindow : Window
     private readonly AppSettings _settings;
     private bool _loading = true;
 
-    private SettingsWindow(AppSettings settings, string modelDirectory)
+    // internal 而不是 private：窗口构造测试要能 new 它。
+    // 对外仍然只有 Show()，单例语义没变。
+    internal SettingsWindow(AppSettings settings, string modelDirectory)
     {
         _settings = settings;
         InitializeComponent();

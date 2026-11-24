@@ -1,5 +1,7 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using AwesomeRealtimeTranslator.Core;
 using Whisper.net;
 
@@ -90,6 +92,24 @@ public sealed class WhisperTranscriber : ITranscriber
                 "多半是下载或解压中断了，重新解压一次安装包。");
         }
 
+        // 大小对得上、内容不对的情况是真会发生的：解压中断、杀毒软件替换过文件、
+        // 外接盘没写完就拔掉。不先验这一下，whisper.cpp 会在 native 层直接踩空，
+        // 抛一个 SEHException，用户只看到「External component has thrown an exception」。
+        // 不用 stackalloc：这是 async 方法，栈上的 Span 跨不过下面的 await。
+        byte[] header = new byte[4];
+        using (FileStream stream = File.OpenRead(_modelPath))
+        {
+            stream.ReadExactly(header, 0, header.Length);
+        }
+
+        if (BinaryPrimitives.ReadUInt32LittleEndian(header) != GgmlMagic)
+        {
+            throw new TranscriberException(
+                $"语音识别模型文件损坏了：{_modelPath}\n" +
+                "大小对得上，但文件头不对，内容是坏的。\n" +
+                "重新完整解压一次安装包，并且把程序文件夹放在本机硬盘上，别放外接盘或网络盘。");
+        }
+
         progress?.Report("正在加载语音识别模型…");
 
         try
@@ -141,6 +161,21 @@ public sealed class WhisperTranscriber : ITranscriber
                 $"语音识别组件加载失败，系统找不到它需要的原生库。\n{hint}\n（{ex.Message}）",
                 ex);
         }
+        catch (SEHException ex)
+        {
+            // 原生层踩空了，而大小和文件头都已经验过，所以不是明显的坏文件。
+            //
+            // 线上见过一次这个，证据是：程序放在 E: 盘时连续两次都在这里失败，
+            // 整个文件夹复制到 C:\Users\...\Downloads 下之后连续三次都正常。
+            // 真正的原因没查清（没有 Windows 机器可复现），但那条经验对用户有用，
+            // 比丢一句「External component has thrown an exception」强。
+            throw new TranscriberException(
+                "语音识别引擎在加载模型时崩了，但模型文件本身看起来是完整的。\n" +
+                "已知有效的办法：把整个程序文件夹复制到系统盘上再运行——\n" +
+                "比如「下载」或「文档」里，别放在其他分区、外接硬盘、U 盘或网络盘上。\n" +
+                $"（{ex.Message}）",
+                ex);
+        }
         catch (Exception ex) when (ex is not TranscriberException)
         {
             throw new TranscriberException($"语音识别模型加载失败：{ex.Message}", ex);
@@ -149,6 +184,12 @@ public sealed class WhisperTranscriber : ITranscriber
 
     /// <summary>比这还小的模型文件一定是坏的。最小的 tiny 模型也有 74MB。</summary>
     private const long MinPlausibleModelBytes = 60L * 1024 * 1024;
+
+    /// <summary>
+    /// ggml 文件头的前 4 字节，GGML_FILE_MAGIC。落到磁盘上是 ASCII "lmgg"
+    /// （小端），已经对着实际的 ggml-base.bin 用 xxd 核过。
+    /// </summary>
+    private const uint GgmlMagic = 0x67676d6c;
 
     public Task StartAsync(CancellationToken cancellationToken = default)
     {

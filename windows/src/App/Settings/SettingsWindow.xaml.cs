@@ -47,8 +47,10 @@ public partial class SettingsWindow : Window
         SaveTranscriptsBox.IsChecked = settings.SaveTranscripts;
         ModelPathText.Text = $"模型目录：{modelDirectory}";
 
-        UpdateLabels();
+        // 必须在 UpdateLabels() 之前放开：UpdateLabels 自己带 _loading 守卫。
+        // 到这里控件值都已经赋完，放开它不会再触发任何写配置的回调。
         _loading = false;
+        UpdateLabels();
 
         // 真的拿到焦点之后就撤掉 Topmost。它只是用来保证窗口能被看见，
         // 不是要一直压在别人头上。见 Show() 里的解释。
@@ -64,7 +66,14 @@ public partial class SettingsWindow : Window
     /// 的前台切换限制直接拒绝，设置窗<b>开在了前台窗口的后面</b>。
     ///
     /// 用户看到的就是「点设置没反应」。再点一次还是没反应，因为单例已经建好了，
-    /// Show() 变成空操作，Activate() 继续被拒。线上反馈的「点设置就卡死」就是这个。
+    /// Show() 变成空操作，Activate() 继续被拒。
+    ///
+    /// <b>声明：这不是 0.1.4 之前「点设置就卡死」的原因</b>，那个是
+    /// <see cref="UpdateLabels"/> 里的 NullReferenceException——窗口根本没构造出来，
+    /// 压根走不到这里。0.1.4 当时就是照这段推理改的，改错了方向。
+    /// 这段机制本身是真的（WS_EX_NOACTIVATE 的前台限制有文档可查），但因为
+    /// 设置窗在 0.1.5 之前从来没打开过，<b>它到底需不需要仍然没有被实测验证过</b>。
+    /// 保留是因为代价为零：拿到焦点就自动撤掉。
     ///
     /// Topmost 不受前台切换限制，窗口能浮上来；用户点一下它就正常拿到焦点，
     /// 然后 Activated 把 Topmost 撤掉。如果始终没拿到焦点，它就一直浮着——
@@ -102,8 +111,27 @@ public partial class SettingsWindow : Window
         SourceLanguageBox.SelectedIndex = 0;
     }
 
+    /// <summary>
+    /// <b>这个守卫不是防御性编程，少了它必崩。</b>（0.1.5 修的，之前每台机器
+    /// 点设置都 100% 崩溃或报错，设置窗从来没有真正打开过。）
+    ///
+    /// XAML 解析到 <c>&lt;Slider Minimum="11"&gt;</c> 时，WPF 会把 Value 的默认值 0
+    /// 强制抬到 11，<b>当场</b>触发 ValueChanged → OnFontSizeChanged → 这里。
+    /// 而此刻 InitializeComponent() 还在往下走，FontSizeValue 这些 TextBlock
+    /// 在 XAML 里写在 Slider 后面，字段还是 null —— NullReferenceException。
+    ///
+    /// 四个 slider 的 Minimum 都大于 0，所以四个都会这样触发，每次开窗必中。
+    /// 原来的 _loading 守卫只挡住了「写配置」，没挡住「刷标签」，就漏在这里。
+    ///
+    /// 构造函数末尾会主动调一次，所以加载期间跳过不会少更新任何东西。
+    /// </summary>
     private void UpdateLabels()
     {
+        if (_loading)
+        {
+            return;
+        }
+
         FontSizeValue.Text = ((int)FontSizeSlider.Value).ToString(CultureInfo.InvariantCulture);
         OpacityValue.Text = OpacitySlider.Value.ToString("P0", CultureInfo.InvariantCulture);
         LinesValue.Text = ((int)LinesSlider.Value).ToString(CultureInfo.InvariantCulture);

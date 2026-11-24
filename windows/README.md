@@ -178,11 +178,13 @@ Mac 版是一个 `.app` 包，看起来是一个图标，其实是目录。Windo
   开发机上完成了端到端翻译，上面那些译文就是实际输出。单句 36~128ms。
 - 管道的全部错误路径：识别器加载失败、翻译器降级、音频中断、停机冲刷。
 
-**已验证（真实 Windows 用户，0.1.3）**
+**已验证（真实 Windows 用户，0.1.3 / 0.1.4 的日志）**
 
 - **WASAPI loopback 真的抓到了声音。** 原来的第一大未知项，通过。
 - Whisper.net 在 0.1.2 之后的目录布局下能找到原生库，模型加载正常。
 - 整条链路出字幕、出译文。
+- 反过来也验证出两件坏事，都有堆栈：设置窗从 0.1.0 起就没打开过，
+  以及程序放在非系统盘时模型加载会崩。两条都在 0.1.5 里处理了（见下）。
 
 **还没验证**
 
@@ -194,46 +196,103 @@ Mac 版是一个 `.app` 包，看起来是一个图标，其实是目录。Windo
 3. 全局快捷键是否被别的程序占用。
 4. 长会话的稳定性、内存和 CPU 占用。
 5. 在装了第三方杀毒软件的机器上会不会被误报拦截。
-6. 0.1.4 对设置窗那两个修复本身也没在 Windows 上验证过（见下）。
+6. 0.1.5 对设置窗的修复本身。病因是从一条真实堆栈定位的（见下），
+   证据比 0.1.4 那两个猜测强得多，但**我仍然没有在 Windows 上点开过这个窗口**。
+7. 放在非系统盘上模型加载崩掉那件事，病因还没查清（见下）。
 
 把第 1 条跑通，这个版本才算真的能用。其余都是调参。
 
-### 设置窗打不开 / 卡死（0.1.4 修的）
+### 设置窗从来没有打开过（0.1.5 修的）
 
 第一次真实 Windows 反馈同时带来了一个 bug：**点「设置」卡死或闪退。**
-查下来是两个独立的问题叠在一起，都只可能在真 Windows 上出现。
+0.1.4 猜了两个病因，**都猜错了**。真正的原因是 0.1.5 才定位到的，
+而定位它靠的是 0.1.4 里唯一那个不是猜测的改动。这一节按时间顺序记，
+因为过程本身比结论更值得留着。
 
-**一、设置窗开在了别的窗口后面**
+**真正的病因：XAML 解析期间的 NullReferenceException**
 
-字幕窗带 `WS_EX_NOACTIVATE`，点它不会让本进程变成前台进程——这是故意的，
-面试时打字不能被打断。副作用在这里咬了一口：用户点 ⚙ 的那一刻，前台进程
-仍然是浏览器或会议软件，于是 `Window.Activate()` 被 Windows 的前台切换限制
-直接拒绝，设置窗开在了前台窗口的**后面**。
+```
+NullReferenceException at SettingsWindow.UpdateLabels()
+  ← SettingsWindow.OnFontSizeChanged()
+  ← Slider.OnValueChanged()
+  ← RangeBase.OnMinimumChanged()          ← 注意这里
+  ← XamlObjectWriter.WriteEndMember()
+  ← SettingsWindow.InitializeComponent()  ← 窗口还在构造中
+```
 
-用户看到的是「点设置没反应」。再点一次还是没反应，因为单例已经建好，
-`Show()` 变成空操作，`Activate()` 继续被拒。这就是反馈里的「卡死」。
+XAML 里写的是 `<Slider x:Name="FontSizeSlider" Minimum="11" …>`，而 `Slider.Value`
+的默认值是 0。解析器设 `Minimum=11` 的那一刻，WPF 把 Value 从 0 强制抬到 11，
+**当场**触发 `ValueChanged` → `OnFontSizeChanged` → `UpdateLabels()`。
+可此刻 `InitializeComponent()` 还在往下走，`FontSizeValue` 这个 TextBlock
+在 XAML 里写在 Slider **后面**，字段还是 null。
 
-修法：开窗时先 `Topmost = true`（不受前台切换限制），等它真的拿到焦点，
-`Activated` 再把 Topmost 撤掉。始终没拿到焦点就一直浮着——正是想要的兜底。
+四个滑块的 `Minimum` 都大于 0，所以四个都会这样触发。这不是偶发、不挑机器、
+不挑时序：**从 0.1.0 到 0.1.4，设置窗在任何一台 Windows 机器上都没有真正打开过。**
 
-**二、拖滑块时每跨一个刻度就写一次磁盘**
+原来的 `_loading` 守卫只挡住了「写配置」这一半：
 
-设置窗的滑块是 `IsSnapToTickEnabled` 的，不透明度那条从 0.3 拖到 1.0
-要触发 35 次 `ValueChanged`。而 `FileSettingsStore.Set` 以前是**同步落盘**：
-每次都「写临时文件 + `File.Move` 替换」，`%APPDATA%` 下的写入还要过一遍
-实时杀毒扫描，几十毫秒起步。35 次叠在 UI 线程上，就是肉眼可见的卡顿。
+```csharp
+if (!_loading) { _settings.FontSize = e.NewValue; }
+UpdateLabels();   // ← 没挡住，就漏在这里
+```
 
-改成合并写：内存立刻生效，停手 300ms 才落一次盘，退出时 `Flush()` 兜底。
+修法是把守卫下沉到 `UpdateLabels()` 自己身上——一处生效，四个处理器全覆盖，
+以后新加的处理器也不会再踩同一个坑。
 
-**三、界面线程的异常原来没人接**
+**0.1.4 猜错的两条**
+
+一是 `WS_EX_NOACTIVATE` 导致 `Activate()` 被前台切换限制拒绝、设置窗开在别人
+后面。这个机制是真的、有文档的，但窗口压根没构造出来，走不到那一步。
+代码保留了（代价为零，拿到焦点就自动撤掉 Topmost），但**到底需不需要它，
+仍然没有被实测验证过**，注释里写明了。
+
+二是滑块每跨一个刻度就同步落盘导致卡顿。`FileSettingsStore` 以前确实是
+「写临时文件 + `File.Move` 替换」，一条不透明度滑块从 0.3 拖到 1.0 会触发
+35 次，叠在 UI 线程上确实不合理。改成了停手 300ms 合并写一次、退出时
+`Flush()` 兜底。这个改动本身是对的，但它也不是用户报的那个 bug——
+用户连滑块都没见到过。
+
+**0.1.4 真正起作用的那一条**
 
 `AppDomain.UnhandledException` 和 `TaskScheduler.UnobservedTaskException` 都
 接不到 WPF Dispatcher 上的异常，所以任何界面异常都会直接把进程带走，
-用户看到的就是「闪退」，还什么说法都没有。现在挂了 `DispatcherUnhandledException`：
-记日志、弹个能看的提示、**标成已处理**——设置窗画不出来不该让字幕也一起消失。
+用户看到的就是「闪退」，还什么说法都没有。0.1.4 挂上了
+`DispatcherUnhandledException`，又在 `OpenSettings()` 外面单独包了一层
+（托盘菜单的回调跑在 WinForms 的嵌套消息循环里，不一定经过 Dispatcher）：
+记日志、弹个能看的提示、标成已处理。
 
-前两条是对症下药但**没能在 Windows 上复现验证**，第三条是兜底：就算病因不是
-这两个，下一次反馈也会带着一条明确的错误信息和堆栈，而不是「它就没了」。
+**就是这一条换来了上面那段堆栈。** 教训很直白：在一个自己跑不起来的平台上，
+与其对着症状猜病因，不如先保证下一次失败会带着证据回来。
+
+### 放在 E 盘时模型加载直接崩（0.1.5 加了提示，病因没查清）
+
+同一份日志里还有一条，和设置窗无关：
+
+```
+TranscriberException: 语音识别模型加载失败：External component has thrown an exception.
+SEHException: External component has thrown an exception.
+   at WhisperTranscriber.PrepareAsync(…)
+```
+
+`SEHException` 是原生层踩空了。日志里的证据很干净：
+
+| 程序目录 | 启动次数 | 模型加载 |
+|---|---|---|
+| `E:\实时翻译\…` | 2 | **2 次全失败** |
+| `C:\Users\…\Downloads\…` | 3 | 3 次全正常 |
+
+文件大小检查是过了的（日志记的是 141 MB，正常值），所以不是下载到一半那种
+明显的半截文件。做了两件事：
+
+1. **加了文件头校验。** ggml 文件前 4 字节是 `GGML_FILE_MAGIC`（`0x67676d6c`，
+   落到磁盘上是 ASCII `lmgg`，对着真实的 `ggml-base.bin` 用 xxd 核过）。
+   大小对得上、内容是坏的这种情况确实存在，先验这一下就能给出一句人话，
+   而不是把一个 `SEHException` 丢给用户。这也很可能就是 E 盘那次的真因。
+2. **单独 catch 了 `SEHException`**，把上面那条经验直接写进错误提示：
+   把整个文件夹复制到系统盘下再跑。
+
+**病因没查清**，也没有 Windows 机器可以复现。所以提示的措辞是「已知有效的办法」，
+不是「原因是」——这个区别在这个项目里已经吃过两次教训了。
 
 ### 托盘图标一直是系统默认图标
 

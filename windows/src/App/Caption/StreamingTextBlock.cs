@@ -56,9 +56,14 @@ public sealed class StreamingTextBlock : TextBlock
     private static void OnFullTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var self = (StreamingTextBlock)d;
+        string next = (string)e.NewValue ?? string.Empty;
 
-        // 文本清空（上一句定稿了）时，进度必须归零，否则下一句会从半截开始显示。
-        if (string.IsNullOrEmpty((string)e.NewValue))
+        // 新文本不是已显示内容的延长，就说明换了一句（清空、ItemsControl 回收容器、
+        // 或者模型回头改写了 volatile）。这时进度必须归零，否则下一句会从半截开始显示。
+        //
+        // 0.2.1 之前这里只判空：译文也接上节奏器之后，ItemsControl 复用容器时
+        // 会把上一行的进度带到下一行，屏幕上就是一句译文天生缺了前几个字。
+        if (!next.StartsWith(self.Text, StringComparison.Ordinal))
         {
             self._pacer.Reset();
             self.Text = string.Empty;

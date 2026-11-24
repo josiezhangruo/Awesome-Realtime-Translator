@@ -116,9 +116,18 @@ public sealed class SessionPipeline : IAsyncDisposable
 
         _segmenter = new Segmenter(new Segmenter.Configuration
         {
-            // 0.45s：面试里句子之间的停顿通常在 0.3~0.6s，0.7s 偏保守，译文出得太晚。
-            // 再往下调（<0.35s）会把一句话从中间切断，翻译质量明显下降。
-            SilenceFlushInterval = 0.45,
+            // 1.4s = 识别器 StepInterval(700ms) 的两倍。这里有一条隐式耦合：
+            // Segmenter 的静音判定看的是「距离上一个事件多久」，而识别器在
+            // 对方说话时每 700ms 发一个 volatile。所以任何小于 0.7 的取值，
+            // 测的都不是对方停顿，而是识别器的解码节拍——每两个 volatile 之间
+            // 都会触发一次定稿，把句子切在随机位置上。
+            //
+            // 0.2.0 这里是 0.45（本意是让译文早点出来），用户录像里那句
+            // 切在 "and I" 上的残片就是它干的。见 SilenceCouplingTests。
+            //
+            // 真正的「一句说完了」由识别器自己的 SilenceGap(600ms) 判断，它先触发；
+            // 这里只是识别器彻底不吐东西时的兜底，不需要灵敏。
+            SilenceFlushInterval = 1.4,
         });
 
         // 1. 识别器
@@ -378,8 +387,14 @@ public sealed class SessionPipeline : IAsyncDisposable
                     IReadOnlyList<string> context = _store.RecentContext(3);
                     try
                     {
+                        // 边解码边往字幕里填前缀。贪心解码是 append-only 的，
+                        // 后一次一定以前一次为前缀，所以这不构成「译文被改写」。
+                        Sentence current = sentence;
+                        var partial = new SyncProgress<string>(
+                            prefix => _toUiThread(() => _store.SetTranslation(prefix, current.Id)));
+
                         string translated = await _translator
-                            .TranslateAsync(sentence.Text, context, token)
+                            .TranslateAsync(sentence.Text, context, partial, token)
                             .ConfigureAwait(false);
                         _toUiThread(() => _store.SetTranslation(translated, sentence.Id));
                     }

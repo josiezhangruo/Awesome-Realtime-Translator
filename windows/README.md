@@ -151,11 +151,21 @@ Freezable（画刷、样式），缓存项带着「第一个创建它的线程�
 macOS 的 SpeechAnalyzer 本身就吐 volatile / finalized 事件。Whisper 一次吃一整段音频，
 所以 `WhisperTranscriber` 用「滑动窗口 + 重复解码」造出同样的语义：
 
-- 每 700ms 把**整个当前窗口**重新解码一次 → 作为 volatile 发出去；
-- 检测到停顿超过 600ms → 再解码一次 → 作为 finalized 发出去，清空窗口；
-- 窗口超过 18 秒强制定稿，否则解码耗时会随窗口线性增长。
+- 每 700ms 把**整个当前窗口**重新解码一次 → 作为 volatile 发出去;
+- 检测到停顿超过 600ms → 再解码一次 → 作为 finalized 发出去,清空窗口;
+- 解码结果里出现**句末标点**且前缀连续两次解码没变 → 把前缀定稿,窗口裁到那之后;
+- 窗口超过 7 秒强制定稿,否则解码耗时会随窗口线性增长。
 
-代价是同一段音频被反复解码好几遍，用 CPU 换「边说边出字」。
+代价是同一段音频被反复解码好几遍,用 CPU 换「边说边出字」。
+
+第三条是 0.3.0 加的,起因见下面的「连续说话时译文停摆」。定稿的全部判断抽在
+[`FinalizePolicy`](src/Core/FinalizePolicy.cs) 里——纯逻辑、13 个单测,
+能在没有 Windows 的开发机上跑。这是这个项目反复用的同一招:
+**凡是说不清对错的判断,就抽成不依赖平台的纯函数,否则只能靠猜。**
+
+它只回答「哪段音频可以安全退休」,不回答「句子在哪里结束」。遇到 `Dr.` 这种缩写
+它会误判成边界,没关系:定稿出去的文本以 `Dr.` 结尾,`Segmenter` 的缩写表拒绝在
+那里切句,它留在 buffer 里等下一段拼上。职责分开之后,误判的代价只是多留几秒音频。
 
 静音判定按**挂钟时间**算，不靠数静音采样点——WASAPI loopback 在系统完全没声音时
 根本不给缓冲区，数采样点会永远数不满。同样的原因，采集层会播一路静音把音频会话钉住，
@@ -432,6 +442,63 @@ CI 里有用例盯着：嵌入资源必须存在，且 `LoadTrayIcon()` 返回�
 于是 `_root` 开始会被线程池回调碰到（`Flush` → `Save` → `ToJsonString`），
 而 `JsonObject` 不是线程安全的。实际撞不上——`AppSettings` 只在构造时读一次，
 那时还没人 `Set` 过。但那是「恰好安全」不是「设计安全」，而加锁的代价是零。
+
+### 连续说话时译文停摆（0.3.0 修的）
+
+用户在真会议里录了一段屏发回来，说「译文不流畅，调了显示节奏也没用」。
+按 0.5 秒拆帧之后看到的是这个：
+
+| 时间 | 译文最后一句 | 原文待定稿尾巴 |
+|---|---|---|
+| 0.0s | 所以我没有再讨论这个, 太多的上次,我 | `can share this information... on the backe` |
+| 6.0s | 同上，一个字没动 | 涨到三行，`...how leading brands, communities are` |
+| 8.0s | 同上，一个字没动 | `...how leading brands, just other.` |
+| 10.0s | 一次蹦出**两句** | 新的尾巴 |
+
+**不是不够顺滑，是停滞八秒然后爆发。**四个环节，每个单看都合理：
+
+1. 识别器只在静音超过 600ms 或窗口到 18 秒时才发 finalized。真实会议里对方连着讲，
+   没有 600ms 空档，于是唯一生效的触发器就剩 18 秒上限。
+2. `Segmenter` 只把 finalized 放进 buffer，volatile 只设 `VolatileTail` 就返回。
+   屏幕上那个 `...on the backend. But we really looked at...` 里的句号就在那儿，
+   但没有任何人去看它。
+3. 于是连续说话时，**翻译队列全程是空的**。
+4. 译文控件还是个普通 `TextBlock`，`RevealPace` 只绑在原文尾巴上——
+   所以用户说「调了没用」是对的，那根线物理上就没接。
+
+**同一个根还解释了译文乱码。**`So I didn't go into this too, too much last time and I`
+被切在 `and I` 上：没有句末标点，54 个字符，离 140 上限差得远。
+原因是 `SilenceFlushInterval` 当时是 **0.45 秒，而识别器每 700ms 才发一个 volatile**。
+Segmenter 的静音判定看的是「距离上一个事件多久」，所以它测的根本不是对方停顿，
+而是识别器的解码节拍——每两个 volatile 之间都会触发一次定稿。
+OPUS-MT 拿到一个吊在 `and I` 上的残片，只能吐出语序错乱、末尾挂个孤零零「我」的东西。
+
+四处都改了：
+
+| | 改动 | 代价 |
+|---|---|---|
+| 1 | 加标点定稿触发器（`FinalizePolicy`） | 无。encoder 已看全句 |
+| 2 | `SilenceFlushInterval` 0.45 → 1.4（> StepInterval 0.7） | 无。真正的句末由识别器的 600ms 判，它先触发 |
+| 3 | `MaxWindowSeconds` 18 → 7 | 跨窗口的长句会被劈开。明知的取舍 |
+| 4 | 译文接上 `StreamingTextBlock`，解码器逐 token 吐前缀 | 无 |
+
+第 4 条值得单说：**流式译文是免费的。**OPUS-MT 的解码器本来就逐 token 产出中文，
+旧代码把这些 token 攒到 `</s>` 才一次性返回。encoder 在解码开始前已经看完整个英文
+句子，所以提前显示前缀，译文和原来**一字不差**。而且贪心解码是 append-only 的，
+不违反「译文一旦出现就不再改写」。真要付质量代价的是切子句再分别翻（英译中的语序
+重排会被破坏），那个没有做。
+
+一个顺带修的隐患：`Progress<T>` 是异步派发的，最后一个前缀有可能排在完整译文
+后面送达，把整句覆盖成半句。换成了同步的 `SyncProgress<T>`。
+
+**这次没有在没有 Windows 的情况下靠猜。**新增 29 个用例，其中 17 个
+（`FinalizePolicyTests`、`SilenceCouplingTests`、`StreamingTranslationTests`）
+在 Mac 上就能跑，剩下 4 个（`TranslationPacingTests`）在 CI 的真 Windows 上
+把窗口显示出来、走可视化树，确认译文控件确实是 `StreamingTextBlock`
+且 `Pace` 真的绑上了——纯粹因为上一次就是「以为接上了」才出的事。
+
+还没验证的：这些阈值在真人语速下合不合适。`StableDecodesToCommit = 2`
+（约 1.4 秒）和 `MaxWindowSeconds = 7` 都是按录像里的节奏推的，没有真机数据。
 
 ## 许可证
 

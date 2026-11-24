@@ -160,9 +160,19 @@ public sealed class MarianTranslator : ITranslator
             SentencePieceModel.Load(Path.Combine(_modelDirectory, "source.spm")));
     }
 
+    /// <summary>
+    /// 每生成几个 token 往 <c>partial</c> 报一次。
+    ///
+    /// 不是每个 token 都报：报一次要跨线程 marshal 到 UI，而一个 CJK token
+    /// 往往只有一两个汉字，逐个报的收益肉眼看不出来，开销却是实打实的。
+    /// 3 个 token 大约对应 2~5 个汉字，和 StreamingTextBlock 的节奏器配合够用。
+    /// </summary>
+    private const int PartialReportEvery = 3;
+
     public async Task<string> TranslateAsync(
         string text,
         IReadOnlyList<string> context,
+        IProgress<string>? partial = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -177,7 +187,7 @@ public sealed class MarianTranslator : ITranslator
         await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            return await Task.Run(() => TranslateCore(text, cancellationToken), cancellationToken)
+            return await Task.Run(() => TranslateCore(text, partial, cancellationToken), cancellationToken)
                 .ConfigureAwait(false);
         }
         finally
@@ -186,7 +196,7 @@ public sealed class MarianTranslator : ITranslator
         }
     }
 
-    private string TranslateCore(string text, CancellationToken cancellationToken)
+    private string TranslateCore(string text, IProgress<string>? partial, CancellationToken cancellationToken)
     {
         if (_encoder is null || _decoder is null || _sourceTokenizer is null ||
             _pieceToId is null || _idToPiece is null)
@@ -251,6 +261,19 @@ public sealed class MarianTranslator : ITranslator
 
             generated.Add(next);
             output.Add(next);
+
+            // 解码器本来就是逐 token 产出中文的，旧代码把这些 token 攒到 </s>
+            // 才一次性返回，于是屏幕上是「… 等 N 秒 → 整句砰」。
+            //
+            // 这里把前缀吐出去，<b>译文质量一字不差</b>：encoder 在解码开始前
+            // 已经看完整个英文句子，后面每个 token 都是在完整上下文下算出来的。
+            // 提前让用户看到前缀是免费的——要付代价的是切子句再分别翻，那个会
+            // 破坏英译中的语序重排，这里没有做。
+            if (partial is not null && output.Count % PartialReportEvery == 0)
+            {
+                partial.Report(CollapseCjkSpaces(
+                    TermProtector.RestorePartial(DecodeTarget(output), restore)));
+            }
         }
 
         // 顺序要紧：先把哨兵换回中文，再去中文之间的空格。

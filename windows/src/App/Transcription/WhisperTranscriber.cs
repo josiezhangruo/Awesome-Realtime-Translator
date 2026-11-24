@@ -24,8 +24,14 @@ namespace AwesomeRealtimeTranslator.Transcription;
 /// <item>每 <see cref="StepInterval"/> 把<b>整个窗口</b>重新解码一次，结果作为 Volatile 发出去。
 ///       所以同一段音频会被反复解码好几遍——这是 CPU 换「边说边出字」。</item>
 /// <item>检测到对方停顿超过 <see cref="SilenceGap"/>，再解码一次，作为 Finalized 发出去并清空窗口。</item>
+/// <item>解码结果里出现<b>句末标点</b>且前缀稳定，就把前缀定稿、窗口裁到那之后（见 <see cref="FinalizePolicy"/>）。</item>
 /// <item>窗口超过 <see cref="MaxWindowSeconds"/> 也强制定稿，否则解码耗时会随窗口线性增长。</item>
 /// </list>
+///
+/// 第三条是 0.2.1 加的。只有前两条的时候，真实会议里对方连着讲、没有 600ms 空档，
+/// 唯一生效的触发器就剩 18 秒的窗口上限——实测译文连续 8 秒一个字不动，
+/// 然后几句一起砸出来。定稿规则的全部判断已经抽进 <see cref="FinalizePolicy"/>，
+/// 那是纯逻辑、有单测的，这里只负责把音频和事件接上去。
 ///
 /// 静音判定一律按<b>挂钟时间</b>算，不靠数静音采样点：WASAPI loopback 在系统完全
 /// 没声音时根本不给缓冲区（见 WasapiLoopbackSource），数采样点会永远数不满。
@@ -38,8 +44,19 @@ public sealed class WhisperTranscriber : ITranscriber
     /// <summary>对方停顿多久算一句说完。和 Segmenter 的 0.45s 配合，这里取稍长一点。</summary>
     private static readonly TimeSpan SilenceGap = TimeSpan.FromMilliseconds(600);
 
-    /// <summary>窗口上限。超过就强制定稿，防止解码耗时失控。</summary>
-    private const double MaxWindowSeconds = 18.0;
+    /// <summary>
+    /// 窗口上限。超过就强制定稿，防止解码耗时失控。
+    ///
+    /// 0.2.1 从 18 秒降到 7 秒。18 秒当初是按「解码耗时」选的，没考虑到它同时也是
+    /// 连续说话时<b>译文的最坏等待时间</b>——面试里 18 秒的空白等于整个问题讲完了
+    /// 还没出一个中文字。而且 18 秒的窗口恰好是解码最慢的窗口，偏偏在你已经落后
+    /// 最多的时候才到。
+    ///
+    /// 代价是跨窗口边界的长句会被劈开，译文质量掉一截。加了标点定稿之后这条
+    /// 退化成几乎不触发的兜底，但真触发时确实会切坏——这是明知的取舍：
+    /// 宁可偶尔切坏一句，不要偶尔等 18 秒。
+    /// </summary>
+    private const double MaxWindowSeconds = 7.0;
 
     /// <summary>低于这个时长的窗口不值得解码，纯属浪费 CPU。</summary>
     private const double MinWindowSeconds = 0.4;
@@ -59,7 +76,9 @@ public sealed class WhisperTranscriber : ITranscriber
     private Task? _loop;
     private long _lastSpeechTicks;
     private bool _windowHasSpeech;
-    private string _lastVolatile = string.Empty;
+
+    private readonly FinalizePolicy _policy =
+        new(SilenceGap.TotalSeconds, MaxWindowSeconds);
 
     public WhisperTranscriber(string modelPath, string language, int? threads = null)
     {
@@ -202,7 +221,7 @@ public sealed class WhisperTranscriber : ITranscriber
 
             _window.Clear();
             _windowHasSpeech = false;
-            _lastVolatile = string.Empty;
+            _policy.Reset();
             _lastSpeechTicks = Stopwatch.GetTimestamp();
         }
 
@@ -272,12 +291,10 @@ public sealed class WhisperTranscriber : ITranscriber
                 continue;
             }
 
-            bool shouldFinalize = silentFor >= SilenceGap.TotalSeconds || seconds >= MaxWindowSeconds;
-
-            string text;
+            IReadOnlyList<DecodedSegment> segments;
             try
             {
-                text = await DecodeAsync(snapshot, token).ConfigureAwait(false);
+                segments = await DecodeAsync(snapshot, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -289,36 +306,64 @@ public sealed class WhisperTranscriber : ITranscriber
                 continue;
             }
 
-            if (shouldFinalize)
+            FinalizeDecision decision = _policy.Evaluate(segments, silentFor, seconds);
+
+            if (!decision.ShouldFinalize)
             {
-                lock (_gate)
-                {
-                    // 只丢掉已经解码过的部分：解码期间可能又进来了新音频，
-                    // 那部分必须留给下一个窗口，否则对方说话快的时候会吞字。
-                    int consumed = Math.Min(snapshot.Length, _window.Count);
-                    _window.RemoveRange(0, consumed);
-                    _windowHasSpeech = false;
-                    _lastVolatile = string.Empty;
-                }
-
-                if (text.Length > 0)
-                {
-                    Event?.Invoke(TranscriptEvent.Finalized(text));
-                }
-
+                // 这里<b>不</b>做「文本没变就不发」的去重。去重看着省事，实际上
+                // 让下游的静音判定失灵：Segmenter 数的是「距离上一个事件多久」，
+                // 解码结果稳定时不发事件，就等于告诉它「对方停下来了」，
+                // 于是半句话在随机位置被定稿。重复事件的成本在 CaptionStore
+                // 的 setter 里已经挡掉了（值相同不触发 PropertyChanged）。
+                Event?.Invoke(TranscriptEvent.Volatile(Join(segments, segments.Count)));
                 continue;
             }
 
-            // 文本没变就不发：下游会据此刷新 UI，重复事件等于白刷一帧。
-            if (text.Length > 0 && text != _lastVolatile)
+            lock (_gate)
             {
-                _lastVolatile = text;
-                Event?.Invoke(TranscriptEvent.Volatile(text));
+                int consumed = decision.DropAll
+                    // 只丢掉已经解码过的部分：解码期间可能又进来了新音频，
+                    // 那部分必须留给下一个窗口，否则对方说话快的时候会吞字。
+                    ? Math.Min(snapshot.Length, _window.Count)
+                    : Math.Min(
+                        (int)(decision.TrimSeconds * AudioChunk.SampleRate),
+                        Math.Min(snapshot.Length, _window.Count));
+
+                if (consumed > 0)
+                {
+                    _window.RemoveRange(0, consumed);
+                }
+
+                // 整窗退休了才算没声音；裁掉一截之后窗口里剩下的仍然是人声，
+                // 标成 false 会让下一轮直接 continue，白白丢掉半句。
+                if (decision.DropAll)
+                {
+                    _windowHasSpeech = false;
+                }
+            }
+
+            if (decision.Text.Length > 0)
+            {
+                Event?.Invoke(TranscriptEvent.Finalized(decision.Text));
+            }
+
+            // 部分定稿时，剩下的尾巴立刻补一个 volatile，不然要等下一个
+            // StepInterval 原文区才跟上，屏幕上会空一拍。
+            if (!decision.DropAll)
+            {
+                string whole = Join(segments, segments.Count);
+                string tail = whole.StartsWith(decision.Text, StringComparison.Ordinal)
+                    ? whole[decision.Text.Length..].TrimStart()
+                    : string.Empty;
+                if (tail.Length > 0)
+                {
+                    Event?.Invoke(TranscriptEvent.Volatile(tail));
+                }
             }
         }
     }
 
-    private async Task<string> DecodeAsync(float[] samples, CancellationToken token)
+    private async Task<IReadOnlyList<DecodedSegment>> DecodeAsync(float[] samples, CancellationToken token)
     {
         WhisperProcessor? processor;
         lock (_gate)
@@ -328,30 +373,48 @@ public sealed class WhisperTranscriber : ITranscriber
 
         if (processor is null)
         {
-            return string.Empty;
+            return [];
         }
 
-        var parts = new List<string>();
+        var parts = new List<DecodedSegment>();
         await foreach (SegmentData segment in processor.ProcessAsync(samples, token).ConfigureAwait(false))
         {
-            parts.Add(segment.Text);
+            // 这里只剥标记不 Trim：段与段之间的空格是拼接的唯一依据，
+            // 提前 Trim 掉会把 "and" "then" 粘成 "andthen"。
+            parts.Add(new DecodedSegment(StripMarkers(segment.Text), segment.End.TotalSeconds));
         }
 
-        return Clean(string.Concat(parts));
+        return parts;
+    }
+
+    /// <summary>把若干段拼成一句话，和 <see cref="FinalizePolicy"/> 里的拼法保持一致。</summary>
+    private static string Join(IReadOnlyList<DecodedSegment> segments, int count)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < count && i < segments.Count; i++)
+        {
+            sb.Append(segments[i].Text);
+        }
+
+        return sb.ToString().Trim();
     }
 
     /// <summary>
     /// whisper.cpp 会把非语音事件写成 <c>[BLANK_AUDIO]</c>、<c>(music)</c> 这类标记，
-    /// 还会在每段前面加一个空格。直接显示到字幕上很难看，在这里统一清掉。
+    /// 直接显示到字幕上很难看，在这里清掉。
+    ///
+    /// <b>刻意不 Trim。</b>whisper 在每段前面加一个空格，那个空格是段与段之间
+    /// 唯一的分词依据；按段清理时提前 Trim 掉，拼起来就成了 <c>andthen</c>。
+    /// 首尾空白统一由拼接方（<see cref="Join"/> / <see cref="FinalizePolicy"/>）去掉。
     /// </summary>
-    private static string Clean(string raw)
+    private static string StripMarkers(string raw)
     {
         if (raw.Length == 0)
         {
             return string.Empty;
         }
 
-        ReadOnlySpan<char> span = raw.AsSpan().Trim();
+        ReadOnlySpan<char> span = raw.AsSpan();
         var sb = new System.Text.StringBuilder(span.Length);
         int depth = 0;
 
@@ -379,7 +442,7 @@ public sealed class WhisperTranscriber : ITranscriber
             }
         }
 
-        return sb.ToString().Trim();
+        return sb.ToString();
     }
 
     public async Task FinishAsync()
@@ -426,7 +489,9 @@ public sealed class WhisperTranscriber : ITranscriber
 
         try
         {
-            string text = await DecodeAsync(remaining, CancellationToken.None).ConfigureAwait(false);
+            IReadOnlyList<DecodedSegment> segments =
+                await DecodeAsync(remaining, CancellationToken.None).ConfigureAwait(false);
+            string text = Join(segments, segments.Count);
             if (text.Length > 0)
             {
                 Event?.Invoke(TranscriptEvent.Finalized(text));

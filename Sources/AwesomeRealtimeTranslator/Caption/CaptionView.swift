@@ -124,7 +124,6 @@ struct CaptionView: View {
                         Text(pinned.map(\.source).joined(separator: " "))
                             .font(.system(size: settings.fontSize - 2, weight: .regular))
                             .foregroundStyle(.white.opacity(0.6))
-                            .textSelection(.enabled)
                     }
                     if settings.displayMode.showsTranslation {
                         // 译文可能还没回来，这里不占位：钉住条本来就是额外多出来的一块，
@@ -134,7 +133,6 @@ struct CaptionView: View {
                             Text(translated)
                                 .font(.system(size: settings.fontSize - 1, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.95))
-                                .textSelection(.enabled)
                         }
                     }
                 }
@@ -143,6 +141,7 @@ struct CaptionView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .background(Color.green.opacity(0.1))
+            .overlay { WindowDragHandle() }
             .overlay(alignment: .bottom) { Divider().opacity(0.25) }
         }
     }
@@ -210,7 +209,6 @@ struct CaptionView: View {
                         Text(message)
                             .font(.system(size: settings.fontSize - 3))
                             .foregroundStyle(.yellow.opacity(0.9))
-                            .textSelection(.enabled)
                     }
 
                     ForEach(visible) { line in
@@ -225,9 +223,13 @@ struct CaptionView: View {
                             .id(Self.pendingAnchor)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
+                // 字幕区整块可拖。放在 ScrollView **内部**：外面是 NSScrollView
+                // 自己，盖不住。minHeight 是为了字幕还很短的时候，下面那片空白
+                // 也能拖。
+                .overlay { WindowDragHandle() }
             }
             // 逐字显现时文本高度是连续长高的，而 onChange 只在「批」到达时才触发，
             // 中间的增长没人管会把内容顶到可视区以下。底部锚定让它自己跟住。
@@ -258,6 +260,11 @@ struct CaptionView: View {
         }
     }
 
+    /// 字幕行**不可选中**。
+    ///
+    /// 选中和拖窗是同一个手势，只能二选一。选在拖窗这边，是因为字幕区每来一句
+    /// 就自动滚到底 —— 你在这里选中的文字下一秒就被滚走了，这个「选中复制」
+    /// 本来就不好用。要抄某个问题去备忘录（📝）里抄，那里是静态的。
     @ViewBuilder
     private func lineView(_ line: CaptionLine) -> some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -265,7 +272,6 @@ struct CaptionView: View {
                 Text(line.source)
                     .font(.system(size: settings.fontSize, weight: .regular))
                     .foregroundStyle(settings.displayMode == .bilingual ? .white.opacity(0.72) : .white)
-                    .textSelection(.enabled)
             }
             if settings.displayMode.showsTranslation {
                 // 译文行**始终占位**，哪怕译文还没回来。
@@ -289,7 +295,6 @@ struct CaptionView: View {
         if let translation = line.translation, !translation.isEmpty {
             Text(translation)
                 .foregroundStyle(.white)
-                .textSelection(.enabled)
         } else if line.translationFailed {
             Text("（本句翻译失败）")
                 .foregroundStyle(.orange.opacity(0.8))

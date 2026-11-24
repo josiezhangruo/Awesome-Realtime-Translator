@@ -36,6 +36,7 @@
 		E7FEABB13F63403ACEC1B25D /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 65C241385442433167F784C9 /* AppIcon.icns */; };
 		E8DA5E9A0242C346402AB636 /* AudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9336D68C5646D3A3B4526F8B /* AudioSource.swift */; };
 		EA0AF8D4384194E42739150A /* AwesomeRealtimeTranslatorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6CEE58394A268C9F050857 /* AwesomeRealtimeTranslatorApp.swift */; };
+		EBF6DE3A5A703B3C402920E0 /* WindowDragHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2C28671E713ECFD00427438 /* WindowDragHandle.swift */; };
 		EE0BF5E089B619134BE1A5F6 /* CaptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10B27AE97BBE0ED7A32484C /* CaptionView.swift */; };
 		F95F596A37CB023D8754039E /* OnboardingWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B937985CC362EEFAEA50950 /* OnboardingWindow.swift */; };
 		FBFF445E4153C29D0857FDAA /* QuestionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7F20DDEE00DE6189139514 /* QuestionDetector.swift */; };
@@ -68,6 +69,7 @@
 		CC51F346358A4099E9A3A845 /* SegmenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SegmenterTests.swift; sourceTree = "<group>"; };
 		DDC5661CDB013B2176C17C1A /* PinnedQuestionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedQuestionTests.swift; sourceTree = "<group>"; };
 		E10B27AE97BBE0ED7A32484C /* CaptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionView.swift; sourceTree = "<group>"; };
+		E2C28671E713ECFD00427438 /* WindowDragHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowDragHandle.swift; sourceTree = "<group>"; };
 		E370225C17C96D2594511BC2 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		F64B5DFE8A73815A223E4D07 /* AwesomeRealtimeTranslatorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AwesomeRealtimeTranslatorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA58C00461B358C2044A943E /* SettingsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindow.swift; sourceTree = "<group>"; };
@@ -138,6 +140,7 @@
 				9EC8358EA2A67092AC7057F2 /* CaptionStore.swift */,
 				E10B27AE97BBE0ED7A32484C /* CaptionView.swift */,
 				70DF7F8AB950944E709D3CC7 /* StreamingText.swift */,
+				E2C28671E713ECFD00427438 /* WindowDragHandle.swift */,
 			);
 			path = Caption;
 			sourceTree = "<group>";
@@ -346,6 +349,7 @@
 				DD08D8E6677A15B8D93963F5 /* SystemAudioCapture.swift in Sources */,
 				3A7DBA33A7B6D4B8DDE68152 /* Transcriber.swift in Sources */,
 				5E6B76FA749608545CA1D4C0 /* Translator.swift in Sources */,
+				EBF6DE3A5A703B3C402920E0 /* WindowDragHandle.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -420,7 +424,7 @@
 				CODE_SIGN_IDENTITY = "Leon Build";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -436,7 +440,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -517,7 +521,7 @@
 				CODE_SIGN_IDENTITY = "Leon Build";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -539,7 +543,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

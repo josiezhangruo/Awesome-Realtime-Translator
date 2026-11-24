@@ -58,7 +58,7 @@ is more responsive but visibly steppy, higher is smoother but lags further behin
 
 Needs **macOS 26 or newer**. Universal binary (Apple Silicon and Intel), 0.8 MB.
 
-1. [Download](https://yangli-0409.github.io/Awesome-Realtime-Translator/AwesomeRealtimeTranslator-0.2.0.zip),
+1. [Download](https://yangli-0409.github.io/Awesome-Realtime-Translator/AwesomeRealtimeTranslator-0.2.1.zip),
    unzip, drag into Applications.
 2. **Open it with right-click the first time.** macOS will say the developer cannot be verified,
    because there is no Apple developer certificate behind this build. Right-click the app →
